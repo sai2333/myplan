@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { startOfDay, endOfDay } from 'date-fns';
 import { Habit, HabitLog, Todo } from '../types';
 
 let db: SQLite.SQLiteDatabase | null = null;
@@ -54,7 +55,11 @@ const ensureDB = async (): Promise<SQLite.SQLiteDatabase> => {
         note TEXT,
         relatedHabitId TEXT,
         category TEXT,
-        notificationId TEXT
+        notificationId TEXT,
+        completedAt TEXT
+        );
+        CREATE TABLE IF NOT EXISTS categories (
+        name TEXT PRIMARY KEY NOT NULL
         );
       `);
 
@@ -70,7 +75,9 @@ const ensureDB = async (): Promise<SQLite.SQLiteDatabase> => {
         'ALTER TABLE todos ADD COLUMN note TEXT',
         'ALTER TABLE todos ADD COLUMN relatedHabitId TEXT',
         'ALTER TABLE todos ADD COLUMN category TEXT',
+        'ALTER TABLE todos ADD COLUMN categories TEXT', // JSON string for multiple categories
         'ALTER TABLE todos ADD COLUMN notificationId TEXT',
+        'ALTER TABLE todos ADD COLUMN completedAt TEXT',
         'ALTER TABLE habit_logs ADD COLUMN imageUri TEXT'
       ];
 
@@ -246,17 +253,20 @@ export const getHabitLogs = async (habitId: string): Promise<HabitLog[]> => {
 
 export const getTodayLogs = async (): Promise<HabitLog[]> => {
   return runWithRetry(async (database) => {
-    // Simple check for today's logs (string comparison relies on ISO format YYYY-MM-DD...)
-    const todayStart = new Date().toISOString().split('T')[0]; 
-    const result = await database.getAllAsync<any>('SELECT * FROM habit_logs WHERE timestamp LIKE ?', [`${todayStart}%`]);
+    const now = new Date();
+    const start = startOfDay(now).toISOString();
+    const end = endOfDay(now).toISOString();
+    const result = await database.getAllAsync<any>('SELECT * FROM habit_logs WHERE timestamp >= ? AND timestamp <= ?', [start, end]);
     return result;
   });
 };
 
 export const getLogsForDate = async (dateISO: string): Promise<HabitLog[]> => {
   return runWithRetry(async (database) => {
-    const dateStart = dateISO.split('T')[0];
-    const result = await database.getAllAsync<any>('SELECT * FROM habit_logs WHERE timestamp LIKE ?', [`${dateStart}%`]);
+    const date = new Date(dateISO);
+    const start = startOfDay(date).toISOString();
+    const end = endOfDay(date).toISOString();
+    const result = await database.getAllAsync<any>('SELECT * FROM habit_logs WHERE timestamp >= ? AND timestamp <= ?', [start, end]);
     return result;
   });
 };
@@ -282,32 +292,33 @@ export const getTodos = async (): Promise<Todo[]> => {
     return result.map(row => ({
         ...row,
         isCompleted: !!row.isCompleted,
+        categories: row.categories ? JSON.parse(row.categories) : (row.category ? [row.category] : []), // Fallback to category for migration
     }));
   });
 };
 
 export const addTodo = async (todo: Todo) => {
   await runWithRetry(async (database) => {
-    const { id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId } = todo;
+    const { id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, categories, notificationId, completedAt } = todo;
     await database.runAsync(
-      'INSERT INTO todos (id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, content, isCompleted ? 1 : 0, dueDate || null, createdAt, reminderTime || null, note || null, relatedHabitId || null, category || null, notificationId || null]
+      'INSERT INTO todos (id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, categories, notificationId, completedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, content, isCompleted ? 1 : 0, dueDate || null, createdAt, reminderTime || null, note || null, relatedHabitId || null, category || null, categories ? JSON.stringify(categories) : null, notificationId || null, completedAt || null]
     );
   });
 };
 
-export const toggleTodo = async (id: string, isCompleted: boolean) => {
+export const toggleTodo = async (id: string, isCompleted: boolean, completedAt?: string | null) => {
   await runWithRetry(async (database) => {
-    await database.runAsync('UPDATE todos SET isCompleted = ? WHERE id = ?', [isCompleted ? 1 : 0, id]);
+    await database.runAsync('UPDATE todos SET isCompleted = ?, completedAt = ? WHERE id = ?', [isCompleted ? 1 : 0, completedAt || null, id]);
   });
 };
 
 export const updateTodo = async (todo: Todo) => {
   await runWithRetry(async (database) => {
-    const { id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId } = todo;
+    const { id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, categories, notificationId, completedAt } = todo;
     await database.runAsync(
-        'UPDATE todos SET content = ?, isCompleted = ?, dueDate = ?, createdAt = ?, reminderTime = ?, note = ?, relatedHabitId = ?, category = ?, notificationId = ? WHERE id = ?',
-        [content, isCompleted ? 1 : 0, dueDate || null, createdAt, reminderTime || null, note || null, relatedHabitId || null, category || null, notificationId || null, id]
+        'UPDATE todos SET content = ?, isCompleted = ?, dueDate = ?, createdAt = ?, reminderTime = ?, note = ?, relatedHabitId = ?, category = ?, categories = ?, notificationId = ?, completedAt = ? WHERE id = ?',
+        [content, isCompleted ? 1 : 0, dueDate || null, createdAt, reminderTime || null, note || null, relatedHabitId || null, category || null, categories ? JSON.stringify(categories) : null, notificationId || null, completedAt || null, id]
     );
   });
 };
@@ -315,6 +326,24 @@ export const updateTodo = async (todo: Todo) => {
 export const deleteTodo = async (id: string) => {
   await runWithRetry(async (database) => {
     await database.runAsync('DELETE FROM todos WHERE id = ?', [id]);
+  });
+};
+
+// Category Operations
+export const getCategories = async (): Promise<string[]> => {
+  return runWithRetry(async (database) => {
+    const result = await database.getAllAsync<{name: string}>('SELECT name FROM categories ORDER BY name ASC');
+    return result.map(r => r.name);
+  });
+};
+
+export const addCategory = async (category: string) => {
+  await runWithRetry(async (database) => {
+    try {
+      await database.runAsync('INSERT INTO categories (name) VALUES (?)', [category]);
+    } catch (e) {
+      // Ignore duplicate errors
+    }
   });
 };
 
@@ -373,8 +402,8 @@ export const restoreData = async (habits: Habit[], logs: HabitLog[], todos: Todo
 
       for (const todo of todos) {
         await database.runAsync(
-          'INSERT INTO todos (id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [todo.id, todo.content, todo.isCompleted ? 1 : 0, todo.dueDate || null, todo.createdAt, todo.reminderTime || null, todo.note || null, todo.relatedHabitId || null, todo.category || null, todo.notificationId || null]
+          'INSERT INTO todos (id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, categories, notificationId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [todo.id, todo.content, todo.isCompleted ? 1 : 0, todo.dueDate || null, todo.createdAt, todo.reminderTime || null, todo.note || null, todo.relatedHabitId || null, todo.category || null, todo.categories ? JSON.stringify(todo.categories) : null, todo.notificationId || null]
         );
       }
 

@@ -30,14 +30,7 @@ export const StatsScreen = () => {
   const completedTodos = todos.filter(t => t.isCompleted).length;
   const todoCompletionRate = totalTodos > 0 ? Math.round((completedTodos / totalTodos) * 100) : 0;
 
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      fetchTodos();
-      loadData();
-    });
-
-    return () => task.cancel();
-  }, [todayLogs]); // Reload when today's logs change
+  const [ready, setReady] = useState(false);
 
   const loadData = async () => {
     const today = new Date();
@@ -58,6 +51,24 @@ export const StatsScreen = () => {
     const yearLogs = await getLogsSince(oneYearAgo.toISOString());
     setAnnualLogs(yearLogs);
   };
+
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setReady(true);
+      fetchTodos();
+      loadData();
+    });
+
+    return () => task.cancel();
+  }, [todayLogs]); // Reload when today's logs change
+
+  if (!ready) {
+    return (
+        <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
+            <Text>加载统计数据...</Text>
+        </View>
+    );
+  }
 
   const maxCount = Math.max(...weeklyData.map(d => d.count), 1); // Avoid division by zero
 

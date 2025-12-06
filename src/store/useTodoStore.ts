@@ -5,17 +5,21 @@ import * as NotificationService from '../services/notification';
 
 interface TodoState {
   todos: Todo[];
+  categories: string[];
   loading: boolean;
   loaded: boolean;
   fetchTodos: (force?: boolean) => Promise<void>;
-  addTodo: (content: string, dueDate?: string, reminderTime?: string, note?: string, relatedHabitId?: string, category?: string) => Promise<void>;
+  addTodo: (content: string, dueDate?: string, reminderTime?: string, note?: string, relatedHabitId?: string, categories?: string[], autoPostpone?: boolean) => Promise<void>;
   updateTodo: (todo: Todo) => Promise<void>;
   toggleTodo: (id: string, isCompleted: boolean) => Promise<void>;
   deleteTodo: (id: string) => Promise<void>;
+  addCategory: (category: string) => Promise<void>;
+  fetchCategories: () => Promise<void>;
 }
 
 export const useTodoStore = create<TodoState>((set, get) => ({
   todos: [],
+  categories: [],
   loading: false,
   loaded: false,
 
@@ -24,7 +28,35 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     set({ loading: true });
     try {
       await DB.initDB();
-      const todos = await DB.getTodos();
+      let todos = await DB.getTodos();
+
+      // Auto Postpone Logic
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const updates: Todo[] = [];
+
+      todos.forEach(t => {
+        if (!t.isCompleted && t.autoPostpone && t.dueDate) {
+          const dueStr = t.dueDate.split('T')[0];
+          if (dueStr < todayStr) {
+             // Move to today
+             // Preserve time if possible, or just set to current time
+             updates.push({ ...t, dueDate: today.toISOString() });
+          }
+        }
+      });
+
+      if (updates.length > 0) {
+          for (const t of updates) {
+              await DB.updateTodo(t);
+          }
+          // Reflect changes in local list
+          todos = todos.map(t => {
+              const found = updates.find(u => u.id === t.id);
+              return found || t;
+          });
+      }
+
       set({ todos, loading: false, loaded: true });
     } catch (error) {
       console.error('Failed to fetch todos:', error);
@@ -32,7 +64,29 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     }
   },
 
-  addTodo: async (content: string, dueDate?: string, reminderTime?: string, note?: string, relatedHabitId?: string, category?: string) => {
+  fetchCategories: async () => {
+    try {
+      await DB.initDB();
+      const categories = await DB.getCategories();
+      set({ categories });
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+    }
+  },
+
+  addCategory: async (category: string) => {
+    if (!category || !category.trim()) return;
+    try {
+      await DB.initDB();
+      await DB.addCategory(category.trim());
+      await get().fetchCategories();
+    } catch (error) {
+      console.error('Failed to add category:', error);
+      throw error;
+    }
+  },
+
+  addTodo: async (content: string, dueDate?: string, reminderTime?: string, note?: string, relatedHabitId?: string, categories?: string[], autoPostpone?: boolean) => {
     let notificationId: string | undefined;
 
     if (reminderTime) {
@@ -53,10 +107,12 @@ export const useTodoStore = create<TodoState>((set, get) => ({
       reminderTime,
       note,
       relatedHabitId,
-      category,
+      categories,
       notificationId,
+      autoPostpone: !!autoPostpone,
       createdAt: new Date().toISOString(),
     };
+
     await DB.addTodo(newTodo);
     await get().fetchTodos(true);
   },
@@ -116,7 +172,8 @@ export const useTodoStore = create<TodoState>((set, get) => ({
         // If we uncheck, we technically should reschedule if time hasn't passed, but that requires more logic.
     }
 
-    await DB.toggleTodo(id, isCompleted);
+    const completedAt = isCompleted ? new Date().toISOString() : null;
+    await DB.toggleTodo(id, isCompleted, completedAt);
     await get().fetchTodos(true);
   },
 

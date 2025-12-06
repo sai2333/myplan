@@ -4,6 +4,7 @@ import { Habit, HabitLog, Todo } from '../types';
 const HABITS_KEY = 'myplan_habits';
 const LOGS_KEY = 'myplan_logs';
 const TODOS_KEY = 'myplan_todos';
+const CATEGORIES_KEY = 'myplan_categories';
 
 export const initDB = async () => {
   // No initialization needed for AsyncStorage
@@ -70,7 +71,10 @@ export const getTodos = async (): Promise<Todo[]> => {
   const json = await AsyncStorage.getItem(TODOS_KEY);
   if (!json) return [];
   const todos = JSON.parse(json) as Todo[];
-  return todos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return todos.map(t => ({
+    ...t,
+    categories: t.categories || (t.category ? [t.category] : []) // Migration logic
+  })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 };
 
 export const addTodo = async (todo: Todo) => {
@@ -99,6 +103,21 @@ export const deleteTodo = async (id: string) => {
   const todos = await getTodos();
   const updatedTodos = todos.filter(t => t.id !== id);
   await AsyncStorage.setItem(TODOS_KEY, JSON.stringify(updatedTodos));
+};
+
+// Category Operations
+export const getCategories = async (): Promise<string[]> => {
+  const json = await AsyncStorage.getItem(CATEGORIES_KEY);
+  if (!json) return [];
+  return JSON.parse(json) as string[];
+};
+
+export const addCategory = async (category: string) => {
+  const categories = await getCategories();
+  if (!categories.includes(category)) {
+    categories.push(category);
+    await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
+  }
 };
 
 // Backup & Restore

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Pressable, Text as RNText } from 'react-native';
 import { Text, IconButton, useTheme, Surface } from 'react-native-paper';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -9,11 +9,13 @@ interface HabitCalendarProps {
   logs: HabitLog[];
   targetValue: number;
   onDatePress: (date: Date) => void;
+  dailyTotals?: Record<string, { totalValue: number; count: number }>;
 }
 
-export const HabitCalendar = ({ logs, targetValue, onDatePress }: HabitCalendarProps) => {
+export const HabitCalendar = ({ logs, targetValue, onDatePress, dailyTotals }: HabitCalendarProps) => {
   const theme = useTheme();
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const CIRCLE_SIZE = 32;
 
   const getDaysInMonth = () => {
     const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 });
@@ -22,7 +24,11 @@ export const HabitCalendar = ({ logs, targetValue, onDatePress }: HabitCalendarP
   };
 
   const getDailyProgress = (date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd'); // Compare just date part
+    const dateStr = format(date, 'yyyy-MM-dd');
+    if (dailyTotals) {
+      const item = dailyTotals[dateStr];
+      return { totalValue: item?.totalValue || 0, count: item?.count || 0 };
+    }
     const dayLogs = logs.filter(log => log.timestamp.startsWith(dateStr));
     const totalValue = dayLogs.reduce((sum, log) => sum + (log.value || 1), 0);
     return { totalValue, count: dayLogs.length };
@@ -68,25 +74,26 @@ export const HabitCalendar = ({ logs, targetValue, onDatePress }: HabitCalendarP
             const isTodayDate = isToday(day);
 
             return (
-              <TouchableOpacity
-                key={dIndex}
+              <Pressable
+                key={format(day, 'yyyy-MM-dd')}
                 style={[styles.dayCell]}
                 onPress={() => onDatePress(day)}
+                android_ripple={{ color: 'transparent' }}
               >
                 <View style={[
                   styles.dayCircle,
                   hasSomeProgress && { backgroundColor: isCompleted ? theme.colors.primary : theme.colors.primaryContainer },
                   isTodayDate && !hasSomeProgress && { borderWidth: 1, borderColor: theme.colors.primary }
                 ]}>
-                  <Text style={[
+                  <RNText style={[
                     styles.dayText,
                     !isCurrentMonth && { opacity: 0.3 },
-                    hasSomeProgress && { color: isCompleted ? '#FFF' : theme.colors.primary }
+                    !hasSomeProgress ? { color: theme.colors.onSurface } : { color: '#FFFFFF' }
                   ]}>
                     {format(day, 'd')}
-                  </Text>
+                  </RNText>
                 </View>
-              </TouchableOpacity>
+              </Pressable>
             );
           })}
         </View>
@@ -99,7 +106,6 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: 12,
     padding: 8,
-    backgroundColor: '#fff',
     marginBottom: 16,
   },
   header: {
@@ -121,6 +127,7 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 9999,
   },
   weekdayText: {
     color: '#888',
@@ -130,10 +137,15 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
   },
   dayText: {
     fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 32,
+    fontWeight: '600',
   },
 });

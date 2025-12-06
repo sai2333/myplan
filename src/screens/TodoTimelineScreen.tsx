@@ -2,7 +2,8 @@ import React, { useEffect, useMemo } from 'react';
 import { View, ScrollView, StyleSheet, InteractionManager } from 'react-native';
 import { Text, Surface, useTheme } from 'react-native-paper';
 import { useTodoStore } from '../store/useTodoStore';
-import { Todo } from '../types';
+import { useHabitStore } from '../store/useHabitStore';
+import { Todo, HabitLog } from '../types';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { useNavigation } from '@react-navigation/native';
 
@@ -10,62 +11,84 @@ export const TodoTimelineScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation();
   const { todos, fetchTodos } = useTodoStore();
+  const { habits, todayLogs, fetchHabits } = useHabitStore();
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
       fetchTodos();
+      fetchHabits(); // Ensure we have habits and logs
     });
 
     return () => task.cancel();
   }, []);
 
-  // Filter for today's todos
-  const sortedTodos = useMemo(() => {
+  // Combine and sort items
+  const timelineItems = useMemo(() => {
     const today = new Date();
-    const todayTodos = todos.filter(todo => {
-       const created = parseISO(todo.createdAt);
-       const due = todo.dueDate ? parseISO(todo.dueDate) : null;
-       const reminder = todo.reminderTime ? parseISO(todo.reminderTime) : null;
-       
-       return isSameDay(created, today) || 
-              (due && isSameDay(due, today)) || 
-              (reminder && isSameDay(reminder, today));
+    const items: { 
+      id: string; 
+      type: 'todo' | 'habit'; 
+      time: string; 
+      content: string; 
+      category?: string;
+      isCompleted: boolean;
+    }[] = [];
+
+    // 1. Completed Todos (using completedAt)
+    todos.forEach(todo => {
+      if (todo.isCompleted && todo.completedAt) {
+        const completedTime = parseISO(todo.completedAt);
+        if (isSameDay(completedTime, today)) {
+          items.push({
+            id: todo.id,
+            type: 'todo',
+            time: todo.completedAt,
+            content: todo.content,
+            category: todo.category,
+            isCompleted: true
+          });
+        }
+      }
     });
 
-    // Helper to get display time
-    const getDisplayTime = (todo: Todo) => {
-      if (todo.reminderTime) return todo.reminderTime;
-      return todo.createdAt;
-    };
-
-    return [...todayTodos].sort((a, b) => {
-      const timeA = getDisplayTime(a);
-      const timeB = getDisplayTime(b);
-      return new Date(timeA).getTime() - new Date(timeB).getTime();
+    // 2. Habit Logs (already today's logs from store, but double check timestamp)
+    todayLogs.forEach(log => {
+      const logTime = parseISO(log.timestamp);
+      if (isSameDay(logTime, today)) {
+        const habit = habits.find(h => h.id === log.habitId);
+        if (habit) {
+           items.push({
+             id: log.id,
+             type: 'habit',
+             time: log.timestamp,
+             content: `${habit.name} (打卡)`,
+             category: habit.category,
+             isCompleted: true
+           });
+        }
+      }
     });
-  }, [todos]);
 
-  const getDisplayTime = (todo: Todo) => {
-    if (todo.reminderTime) return todo.reminderTime;
-    return todo.createdAt;
-  };
+    return items.sort((a, b) => {
+      return new Date(a.time).getTime() - new Date(b.time).getTime();
+    });
+  }, [todos, todayLogs, habits]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView style={styles.scrollContent}>
-        {sortedTodos.length === 0 ? (
+        {timelineItems.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={{ color: theme.colors.onSurfaceVariant }}>今天没有待办事项</Text>
+            <Text style={{ color: theme.colors.onSurfaceVariant }}>今天还没有完成任何事项</Text>
           </View>
         ) : (
           <View style={styles.timelineContainer}>
-            {sortedTodos.map((todo, index) => {
-              const displayTime = getDisplayTime(todo);
-              const timeStr = format(parseISO(displayTime), 'HH:mm');
-              const isLast = index === sortedTodos.length - 1;
+            {timelineItems.map((item, index) => {
+              const timeStr = format(parseISO(item.time), 'HH:mm');
+              const isLast = index === timelineItems.length - 1;
 
               return (
-                <View key={todo.id} style={styles.timelineItem}>
+                <View key={item.id} style={styles.timelineItem}>
                   {/* Time Column */}
                   <View style={styles.timeColumn}>
                     <Text style={styles.timeText}>{timeStr}</Text>
@@ -73,7 +96,10 @@ export const TodoTimelineScreen = () => {
 
                   {/* Line Column */}
                   <View style={styles.lineWeb}>
-                    <View style={[styles.dot, { backgroundColor: todo.isCompleted ? theme.colors.primary : theme.colors.outline }]} />
+                    <View style={[
+                      styles.dot, 
+                      { backgroundColor: item.type === 'habit' ? theme.colors.secondary : theme.colors.primary }
+                    ]} />
                     {!isLast && <View style={[styles.line, { backgroundColor: theme.colors.outlineVariant }]} />}
                   </View>
 
@@ -83,16 +109,21 @@ export const TodoTimelineScreen = () => {
                       <Text 
                         style={[
                           styles.todoContent, 
-                          todo.isCompleted && { textDecorationLine: 'line-through', color: theme.colors.outline }
+                          { textDecorationLine: 'none', color: theme.colors.onSurface }
                         ]}
                       >
-                        {todo.content}
+                        {item.content}
                       </Text>
-                      {todo.category && (
-                        <Text style={[styles.category, { color: theme.colors.secondary }]}>
-                          {todo.category}
-                        </Text>
-                      )}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                         {item.category && (
+                            <Text style={[styles.category, { color: theme.colors.secondary }]}>
+                              {item.category}
+                            </Text>
+                         )}
+                         <Text style={[styles.category, { color: theme.colors.outline, marginLeft: 8 }]}>
+                             {item.type === 'habit' ? '习惯' : '待办'}
+                         </Text>
+                      </View>
                     </Surface>
                   </View>
                 </View>

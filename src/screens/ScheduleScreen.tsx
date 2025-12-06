@@ -78,7 +78,7 @@ export const ScheduleScreen = () => {
           id: habit.id,
           title: habit.name,
           type: 'habit',
-          color: '#4CAF50', // Green
+          color: theme.colors.secondary, // Use theme secondary
           completed: isCompleted
         });
       }
@@ -91,7 +91,7 @@ export const ScheduleScreen = () => {
           id: todo.id,
           title: todo.content,
           type: 'todo',
-          color: '#FF9800', // Orange
+          color: theme.colors.primary, // Use theme primary
           completed: todo.isCompleted
         });
       } else if (!todo.dueDate && isSameDay(date, new Date()) && isSameDay(date, parseISO(todo.createdAt))) {
@@ -100,7 +100,7 @@ export const ScheduleScreen = () => {
             id: todo.id,
             title: todo.content,
             type: 'todo',
-            color: '#2196F3', // Blue
+            color: theme.colors.primary, // Use theme primary
             completed: todo.isCompleted
          });
       }
@@ -124,20 +124,11 @@ export const ScheduleScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-             {/* Simple Breadcrumb style */}
-             <Text style={{ color: theme.colors.secondary, marginRight: 8 }}>日</Text>
-             <Text style={{ color: theme.colors.secondary, marginRight: 8 }}>|</Text>
-             <Text style={{ color: theme.colors.secondary, marginRight: 8 }}>周</Text>
-             <Text style={{ color: theme.colors.secondary, marginRight: 8 }}>|</Text>
-             <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>我的二月</Text>
-        </View>
-        <IconButton icon="dots-horizontal" onPress={() => {}} />
-      </View>
-
-      <View style={styles.monthNavigation}>
-         <Text variant="headlineMedium" style={{fontWeight: 'bold', marginLeft: 16}}>
+      <View style={[styles.monthNavigation, { 
+          paddingTop: insets.top + 10,
+          backgroundColor: theme.colors.surface 
+      }]}>
+         <Text variant="headlineMedium" style={{fontWeight: 'bold', marginLeft: 16, color: theme.colors.onSurface}}>
             {format(currentMonth, 'M月', { locale: zhCN })}
          </Text>
          <View style={{flexDirection: 'row'}}>
@@ -147,9 +138,12 @@ export const ScheduleScreen = () => {
       </View>
 
       {/* Week Days Header */}
-      <View style={styles.weekDaysRow}>
+      <View style={[styles.weekDaysRow, { 
+          backgroundColor: theme.colors.surface,
+          borderBottomColor: theme.colors.outlineVariant || '#eee'
+      }]}>
         {weekDays.map((day, index) => (
-          <Text key={index} style={styles.weekDayText}>{day}</Text>
+          <Text key={index} style={[styles.weekDayText, { color: theme.colors.onSurfaceVariant || '#999' }]}>{day}</Text>
         ))}
       </View>
 
@@ -171,8 +165,11 @@ export const ScheduleScreen = () => {
                                 key={dayIndex}
                                 style={[
                                     styles.cell, 
-                                    { minHeight: 100 }, // Use minHeight instead of fixed height
-                                    // isSelected && { backgroundColor: '#E3F2FD' }
+                                    { 
+                                        minHeight: 100,
+                                        borderColor: theme.colors.outlineVariant || '#eee'
+                                    }, 
+                                    // isSelected && { backgroundColor: theme.colors.secondaryContainer }
                                 ]}
                                 onPress={() => setSelectedDate(date)}
                             >
@@ -180,21 +177,21 @@ export const ScheduleScreen = () => {
                                 <View style={styles.dateHeader}>
                                     <View style={[
                                         styles.dateNumberContainer,
-                                        isToday && styles.todayCircle
+                                        isToday && { backgroundColor: theme.colors.primary }
                                     ]}>
                                         <Text style={[
                                             styles.dateNumber,
-                                            !isCurrentMonth && { color: theme.colors.outline },
-                                            isToday && { color: '#fff', fontWeight: 'bold' }
+                                            { color: isToday ? theme.colors.onPrimary : (isCurrentMonth ? theme.colors.onSurface : theme.colors.outline) },
                                         ]}>
                                             {isToday ? '今' : format(date, 'd')}
                                         </Text>
-                                        {isToday && <Text style={{fontSize: 8, color: '#fff'}}>{lunarText}</Text>}
+                                        {isToday && <Text style={{fontSize: 8, color: theme.colors.onPrimary}}>{lunarText}</Text>}
                                     </View>
                                     
                                     {!isToday && (
                                         <Text style={[
                                             styles.lunarText, 
+                                            { color: theme.colors.onSurfaceVariant || '#999' },
                                             lunarText.length === 2 && ['大雪', '冬至', '小寒', '大寒', '立春', '雨水', '惊蛰', '春分', '清明', '谷雨', '立夏', '小满', '芒种', '夏至', '小暑', '大暑', '立秋', '处暑', '白露', '秋分', '寒露', '霜降', '立冬', '小雪'].includes(lunarText) && { color: theme.colors.primary }
                                         ]}>
                                             {lunarText}
@@ -216,6 +213,7 @@ export const ScheduleScreen = () => {
                                         >
                                             <Text numberOfLines={1} style={[
                                                 styles.taskText,
+                                                { color: theme.colors.onPrimary },
                                                 task.completed && { textDecorationLine: 'line-through' } // Strike through
                                             ]}>
                                                 {task.title}
@@ -254,28 +252,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    backgroundColor: '#fff',
+    // backgroundColor removed, set inline
   },
   monthNavigation: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: '#fff',
+      // backgroundColor removed, set inline
       paddingBottom: 8,
   },
   weekDaysRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 8,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      // borderBottomColor removed, set inline
   },
   weekDayText: {
     width: CELL_WIDTH,
     textAlign: 'center',
-    color: '#999',
     fontSize: 12,
+    // color removed, set inline
   },
   scrollView: {
       flex: 1,
@@ -287,8 +284,8 @@ const styles = StyleSheet.create({
     width: CELL_WIDTH,
     borderRightWidth: 0.5,
     borderBottomWidth: 0.5,
-    borderColor: '#eee',
     padding: 2,
+    // borderColor removed, set inline
   },
   dateHeader: {
     alignItems: 'center',
@@ -303,7 +300,7 @@ const styles = StyleSheet.create({
       borderRadius: 18,
   },
   todayCircle: {
-      backgroundColor: '#2196F3', // Blue circle for Today
+      // backgroundColor removed, set inline
   },
   dateNumber: {
     fontSize: 16,
@@ -311,8 +308,8 @@ const styles = StyleSheet.create({
   },
   lunarText: {
     fontSize: 10,
-    color: '#999',
     marginTop: 0,
+    // color removed, set inline
   },
   tasksContainer: {
       flex: 1,
@@ -327,8 +324,8 @@ const styles = StyleSheet.create({
       width: '100%',
   },
   taskText: {
-      color: '#fff',
       fontSize: 9,
       fontWeight: 'bold',
+      // color removed, set inline
   },
 });

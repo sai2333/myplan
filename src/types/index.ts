@@ -33,5 +33,8 @@ export interface Todo {
   notificationId?: string; // ID of the scheduled notification
   note?: string;
   relatedHabitId?: string;
-  category?: string; // Group/Category
+  category?: string; // Group/Category (Deprecated, use categories)
+  categories?: string[]; // Multiple categories
+  autoPostpone?: boolean; // Whether to automatically move to the next day if not completed
+  completedAt?: string; // ISO Date string of when the todo was completed
 }

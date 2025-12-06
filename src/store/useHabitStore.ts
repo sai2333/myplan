@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { startOfMonth, endOfMonth } from 'date-fns';
+import { InteractionManager } from 'react-native';
+import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { Habit, HabitLog } from '../types';
 import * as DB from '../db';
 import * as NotificationService from '../services/notification';
@@ -11,6 +12,7 @@ interface HabitState {
   monthlyLogs: HabitLog[]; // Logs for the currently displayed month in Schedule view
   loadedMonth: string | null; // Track which month is loaded in monthlyLogs (ISO string)
   currentHabitLogs: HabitLog[]; // Logs for a specific habit (detail view)
+  currentHabitDailyTotals: Record<string, { totalValue: number; count: number }>;
   loading: boolean;
   habitsLoaded: boolean;
   fetchHabits: (force?: boolean) => Promise<void>;
@@ -23,6 +25,7 @@ interface HabitState {
   updateLog: (log: HabitLog) => Promise<void>;
   deleteLog: (id: string, habitId: string) => Promise<void>;
   updateHabit: (habit: Partial<Habit> & { id: string }) => Promise<void>;
+  clearCurrentHabitData: () => void;
 }
 
 export const useHabitStore = create<HabitState>((set, get) => ({
@@ -32,6 +35,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
   monthlyLogs: [],
   loadedMonth: null,
   currentHabitLogs: [],
+  currentHabitDailyTotals: {},
   loading: false,
   habitsLoaded: false,
 
@@ -83,11 +87,26 @@ export const useHabitStore = create<HabitState>((set, get) => ({
 
   fetchHabitLogs: async (habitId: string) => {
     try {
+      // If we are switching to a different habit, we should ideally clear first, but the component handles that too.
+      // However, to be safe, let's make sure we fetch fresh data.
       const logs = await DB.getHabitLogs(habitId);
-      set({ currentHabitLogs: logs });
+      const totals: Record<string, { totalValue: number; count: number }> = {};
+      for (const l of logs) {
+        const key = format(new Date(l.timestamp), 'yyyy-MM-dd');
+        const v = l.value || 1;
+        const item = totals[key] || { totalValue: 0, count: 0 };
+        item.totalValue += v;
+        item.count += 1;
+        totals[key] = item;
+      }
+      set({ currentHabitLogs: logs, currentHabitDailyTotals: totals });
     } catch (error) {
       console.error('Failed to fetch habit logs:', error);
     }
+  },
+
+  clearCurrentHabitData: () => {
+    set({ currentHabitLogs: [], currentHabitDailyTotals: {} });
   },
 
   createHabit: async (name, goal, targetValue, category, frequency = 'daily', frequencyDays, reminderTime) => {
@@ -151,42 +170,94 @@ export const useHabitStore = create<HabitState>((set, get) => ({
 
   logHabit: async (habitId: string, value: number = 1, note?: string, dateISO?: string, imageUri?: string) => {
     const timestamp = dateISO || new Date().toISOString();
+    const { habits, currentHabitDailyTotals, currentHabitLogs } = get();
+    const habit = habits.find(h => h.id === habitId);
+    const target = habit?.targetValue || 1;
+    const key = format(new Date(timestamp), 'yyyy-MM-dd');
+    const currentTotal = currentHabitDailyTotals[key]?.totalValue || 0;
+    if (currentTotal >= target) {
+      throw new Error('今日已达目标');
+    }
+    const remaining = Math.max(0, target - currentTotal);
+    const adjustedValue = Math.min(value || 1, remaining);
     const newLog: HabitLog = {
       id: Date.now().toString(),
       habitId,
       timestamp,
-      value,
+      value: adjustedValue,
       note,
       imageUri,
     };
+    const prevLogs = currentHabitLogs;
+    const prevTotals = currentHabitDailyTotals;
+    const optimisticLogs = habitId ? [...prevLogs, newLog] : prevLogs;
+    const optimisticTotals = { ...prevTotals };
+    const t = optimisticTotals[key] || { totalValue: 0, count: 0 };
+    t.totalValue += adjustedValue;
+    t.count += 1;
+    optimisticTotals[key] = t;
+    set({ currentHabitLogs: optimisticLogs, currentHabitDailyTotals: optimisticTotals });
+
     await DB.addHabitLog(newLog);
 
     const monthISO = dateISO || new Date().toISOString();
-    await Promise.all([
-      get().fetchHabitLogs(habitId),
-      get().fetchLogsForMonth(monthISO, true),
-      dateISO ? get().fetchLogsForDate(dateISO) : Promise.resolve(),
-      get().fetchHabits(true),
-    ]);
+    InteractionManager.runAfterInteractions(() => {
+      Promise.all([
+        get().fetchHabitLogs(habitId),
+        get().fetchLogsForMonth(monthISO, true),
+        dateISO ? get().fetchLogsForDate(dateISO) : Promise.resolve(),
+        get().fetchHabits(true),
+      ]).catch(() => {});
+    });
   },
 
   updateLog: async (log: HabitLog) => {
+    const prevLogs = get().currentHabitLogs;
+    const prevTotals = get().currentHabitDailyTotals;
+    const key = format(new Date(log.timestamp), 'yyyy-MM-dd');
+    const old = prevLogs.find(l => l.id === log.id);
+    const diff = (log.value || 0) - (old?.value || 0);
+    const updatedLogs = prevLogs.map(l => (l.id === log.id ? { ...l, ...log } : l));
+    const updatedTotals = { ...prevTotals };
+    const t = updatedTotals[key] || { totalValue: 0, count: 0 };
+    t.totalValue += diff;
+    updatedTotals[key] = t;
+    set({ currentHabitLogs: updatedLogs, currentHabitDailyTotals: updatedTotals });
+
     await DB.updateHabitLog(log);
-    await Promise.all([
-      get().fetchHabits(true),
-      get().fetchHabitLogs(log.habitId),
-      get().fetchLogsForMonth(log.timestamp, true),
-      get().fetchLogsForDate(log.timestamp),
-    ]);
+    InteractionManager.runAfterInteractions(() => {
+      Promise.all([
+        get().fetchHabits(true),
+        get().fetchHabitLogs(log.habitId),
+        get().fetchLogsForMonth(log.timestamp, true),
+        get().fetchLogsForDate(log.timestamp),
+      ]).catch(() => {});
+    });
   },
 
   deleteLog: async (id: string, habitId: string) => {
+    const prevLogs = get().currentHabitLogs;
+    const prevTotals = get().currentHabitDailyTotals;
+    const target = prevLogs.find(l => l.id === id);
+    const updatedLogs = prevLogs.filter(l => l.id !== id);
+    const updatedTotals = { ...prevTotals };
+    if (target) {
+      const key = format(new Date(target.timestamp), 'yyyy-MM-dd');
+      const t = updatedTotals[key] || { totalValue: 0, count: 0 };
+      t.totalValue -= target.value || 1;
+      t.count = Math.max(0, t.count - 1);
+      updatedTotals[key] = t;
+    }
+    set({ currentHabitLogs: updatedLogs, currentHabitDailyTotals: updatedTotals });
+
     await DB.deleteHabitLog(id);
-    await Promise.all([
-      get().fetchHabits(true),
-      get().fetchHabitLogs(habitId),
-      get().fetchLogsForMonth(new Date().toISOString(), true),
-    ]);
+    InteractionManager.runAfterInteractions(() => {
+      Promise.all([
+        get().fetchHabits(true),
+        get().fetchHabitLogs(habitId),
+        get().fetchLogsForMonth(new Date().toISOString(), true),
+      ]).catch(() => {});
+    });
   },
 
   updateHabit: async (habitChanges) => {

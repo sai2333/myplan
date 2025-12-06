@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, StyleSheet, Alert, ScrollView, Image, Platform } from 'react-native';
+import { View, StyleSheet, Alert, ScrollView, Image, Platform, Keyboard, ActivityIndicator } from 'react-native';
 import { Title, Text, Button, useTheme, Paragraph, List, Portal, Modal, TextInput, IconButton, Divider, Card, Snackbar } from 'react-native-paper';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useHabitStore } from '../store/useHabitStore';
@@ -11,13 +11,18 @@ import { zhCN } from 'date-fns/locale';
 import { HabitLog } from '../types';
 import * as ImagePicker from 'expo-image-picker';
 import RNDateTimePicker from '@react-native-community/datetimepicker';
+import { playCompletionSound } from '../utils/sound';
+
+import { InteractionManager } from 'react-native';
+
+// ... imports
 
 export const HabitDetailScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const theme = useTheme();
   const { id } = route.params as { id: string };
-  const { habits, archiveHabit, fetchHabitLogs, currentHabitLogs, logHabit, updateLog, deleteLog, updateHabit } = useHabitStore();
+  const { habits, archiveHabit, fetchHabitLogs, currentHabitLogs, currentHabitDailyTotals, logHabit, updateLog, deleteLog, updateHabit, clearCurrentHabitData } = useHabitStore();
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -41,17 +46,35 @@ export const HabitDetailScreen = () => {
     return calculateHabitStats(habit, currentHabitLogs);
   }, [habit, currentHabitLogs]);
 
+  const [renderHeavyComponents, setRenderHeavyComponents] = useState(false);
+
   useEffect(() => {
+    // Clear old data immediately
+    clearCurrentHabitData();
+    
+    // Start fetching immediately
     fetchHabitLogs(id);
+
+    // Defer rendering of heavy charts
+    const task = InteractionManager.runAfterInteractions(() => {
+      setRenderHeavyComponents(true);
+    });
+
+    return () => {
+      task.cancel();
+      clearCurrentHabitData();
+    }
   }, [id]);
 
+  // If habit not found, show error
   if (!habit) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <Text>未找到习惯</Text>
       </View>
     );
   }
+
 
   const handleTimeChange = async (event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
@@ -143,12 +166,14 @@ export const HabitDetailScreen = () => {
         now.getMinutes()
       ).toISOString();
       try {
+        Keyboard.dismiss();
+        setModalVisible(false);
         await logHabit(id, value, logNote, timestamp, logImage);
+        playCompletionSound();
         setSnackbarText('记录已添加');
         setSnackbarVisible(true);
-        setModalVisible(false);
-      } catch (e) {
-        setSnackbarText('添加失败');
+      } catch (e: any) {
+        setSnackbarText(e?.message || '添加失败');
         setSnackbarVisible(true);
       }
     }
@@ -211,6 +236,9 @@ export const HabitDetailScreen = () => {
   };
 
   const selectedLogs = getLogsForSelectedDate();
+  const selectedDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  const selectedDayTotal = selectedDateStr ? (currentHabitDailyTotals[selectedDateStr]?.totalValue || 0) : 0;
+  const reachedTarget = (habit.targetValue || 1) <= selectedDayTotal;
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -231,17 +259,28 @@ export const HabitDetailScreen = () => {
         </View>
       </View>
 
-      <HabitCalendar 
-        logs={currentHabitLogs} 
-        targetValue={habit.targetValue || 1} 
-        onDatePress={handleDatePress} 
-      />
+      {renderHeavyComponents ? (
+        <>
+          <HabitCalendar 
+            logs={currentHabitLogs} 
+            targetValue={habit.targetValue || 1} 
+            onDatePress={handleDatePress} 
+            dailyTotals={currentHabitDailyTotals}
+            key={habit.id}
+          />
 
-      <HabitHeatmap 
-        logs={currentHabitLogs} 
-        targetValue={habit.targetValue || 1}
-        color={habit.color}
-      />
+          <HabitHeatmap 
+            logs={currentHabitLogs} 
+            targetValue={habit.targetValue || 1}
+            color={habit.color}
+          />
+        </>
+      ) : (
+        <View style={{ height: 300, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={{ marginTop: 8, color: '#666' }}>加载统计图表...</Text>
+        </View>
+      )}
 
       <View style={styles.infoContainer}>
         <List.Item
@@ -396,10 +435,14 @@ export const HabitDetailScreen = () => {
                 取消编辑
               </Button>
             )}
-            <Button mode="contained" onPress={handleSaveLog} loading={isSaving} disabled={isSaving}>
+            <Button mode="contained" onPress={handleSaveLog} loading={isSaving} disabled={isSaving || reachedTarget}>
               {editingLog ? '更新' : '添加'}
             </Button>
           </View>
+
+          {reachedTarget && (
+            <Text style={{ textAlign: 'right', color: theme.colors.primary, marginTop: 8 }}>今日已达目标</Text>
+          )}
 
           <Button onPress={() => setModalVisible(false)} style={{ marginTop: 16 }}>
             关闭

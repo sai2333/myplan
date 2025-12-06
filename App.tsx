@@ -4,14 +4,15 @@ import { StatusBar } from 'expo-status-bar';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { AppNavigator } from './src/navigation';
 import { theme, darkTheme } from './src/theme';
 import { useSettingsStore } from './src/store/useSettingsStore';
-import { registerForPushNotificationsAsync } from './src/services/notification';
+import { registerForPushNotificationsAsync, ensureChannelExists } from './src/services/notification';
 
 // Suppress the error about Push Notifications in Expo Go (we only use Local Notifications)
 LogBox.ignoreLogs([
-  'expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go',
+  /expo-notifications: Android Push notifications \(remote notifications\) functionality provided by expo-notifications was removed/,
 ]);
 
 Notifications.setNotificationHandler({
@@ -66,7 +67,31 @@ export default function App() {
   const isDarkTheme = useSettingsStore((state) => state.isDarkTheme);
 
   useEffect(() => {
-    registerForPushNotificationsAsync();
+    const initNotifications = async () => {
+      try {
+        // Always ensure channel exists (safe and needed for local notifications on Android)
+        await ensureChannelExists();
+
+        // Check for Expo Go environment
+        // Constants.appOwnership is deprecated/unreliable in newer SDKs for this check
+        const isExpoGo = Constants.executionEnvironment === 'storeClient';
+
+        if (!isExpoGo) {
+          await registerForPushNotificationsAsync();
+        } else {
+          // In Expo Go, we still need permissions for local notifications.
+          // We try to request them, but catch any error related to remote notifications removal.
+          const { status } = await Notifications.getPermissionsAsync();
+          if (status !== 'granted') {
+             await Notifications.requestPermissionsAsync();
+          }
+        }
+      } catch (error) {
+        console.log('Notification initialization error:', error);
+      }
+    };
+
+    initNotifications();
   }, []);
 
   return (
