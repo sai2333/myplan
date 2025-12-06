@@ -16,15 +16,33 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.myplan.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to add images to habit logs."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "8427a80f-a9de-4b52-b852-d513701596d0"
+      }
     }
   }
 }
