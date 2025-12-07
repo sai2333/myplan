@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { List, Switch, Divider, useTheme } from 'react-native-paper';
+import { List, Switch, Divider, useTheme, Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useHabitStore } from '../store/useHabitStore';
@@ -24,7 +24,10 @@ export const SettingsScreen = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10, backgroundColor: theme.colors.surface }]}>
+        <Text variant="titleLarge" style={{ fontWeight: 'bold', color: theme.colors.onSurface }}>设置</Text>
+      </View>
       <List.Section>
         <List.Subheader>常规</List.Subheader>
         <List.Item
@@ -57,5 +60,11 @@ export const SettingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
   },
 });

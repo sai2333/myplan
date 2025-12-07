@@ -9,6 +9,8 @@ import { AppNavigator } from './src/navigation';
 import { theme, darkTheme } from './src/theme';
 import { useSettingsStore } from './src/store/useSettingsStore';
 import { registerForPushNotificationsAsync, ensureChannelExists } from './src/services/notification';
+import * as DB from './src/db';
+import { updateAllWidgets } from './src/services/widget';
 
 // Suppress the error about Push Notifications in Expo Go (we only use Local Notifications)
 LogBox.ignoreLogs([
@@ -65,6 +67,14 @@ Notifications.setNotificationHandler({
 
 export default function App() {
   const isDarkTheme = useSettingsStore((state) => state.isDarkTheme);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      DB.setWidgetTheme(isDarkTheme ? 'dark' : 'light').then(() => {
+        updateAllWidgets();
+      });
+    }
+  }, [isDarkTheme]);
 
   useEffect(() => {
     const initNotifications = async () => {

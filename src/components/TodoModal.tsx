@@ -50,6 +50,8 @@ export const TodoModal = ({ visible, onDismiss, defaultDate, todoToEdit }: TodoM
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateYAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const isDarkMode = theme.dark;
+  const translateXAnim = isDarkMode ? 1 : 0;
 
   useEffect(() => {
     if (visible) {
@@ -329,7 +331,11 @@ export const TodoModal = ({ visible, onDismiss, defaultDate, todoToEdit }: TodoM
                 { 
                     backgroundColor: theme.colors.background,
                     paddingBottom: 20 + keyboardHeight,
-                    transform: [{ translateY: translateYAnim }]
+                    transform: [{ translateY: translateYAnim},{translateX: translateXAnim }],
+                    borderTopWidth: 1,
+                    borderLeftWidth: 1,
+                    borderRightWidth: 1,
+                    borderColor: theme.colors.outline
                 }
             ]}>
               <Text variant="titleLarge" style={styles.title}>{isEditMode ? '编辑待办事项' : '新增待办事项'}</Text>
@@ -462,7 +468,7 @@ export const TodoModal = ({ visible, onDismiss, defaultDate, todoToEdit }: TodoM
 
           <RNModal visible={showCategoryModal} transparent={true} animationType="fade" onRequestClose={() => setShowCategoryModal(false)}>
              <View style={{flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20}}>
-                <View style={{backgroundColor: theme.colors.background, borderRadius: 8, maxHeight: '80%'}}>
+                <View style={{backgroundColor: theme.colors.background, borderRadius: 8, maxHeight: '80%', borderWidth: 1, borderColor: theme.colors.outline}}>
                     <Text style={{fontSize: 18, fontWeight: 'bold', padding: 16, textAlign: 'center', color: theme.colors.onSurface}}>选择分组</Text>
                     <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}>
                         {categories.length === 0 ? (

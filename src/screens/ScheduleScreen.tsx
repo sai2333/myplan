@@ -149,7 +149,7 @@ export const ScheduleScreen = () => {
 
       {/* Calendar Grid */}
       <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 20 }}>
-        <View style={styles.gridContainer}>
+        <View style={[styles.gridContainer, { borderTopWidth: 0.5, borderLeftWidth: 0.5, borderColor: theme.colors.outlineVariant || '#eee' }]}>
             {/* Chunk days into weeks for row-based rendering to handle variable heights */}
             {Array.from({ length: Math.ceil(calendarDays.length / 7) }, (_, i) => calendarDays.slice(i * 7, i * 7 + 7)).map((week, weekIndex) => (
                 <View key={weekIndex} style={{ flexDirection: 'row' }}>

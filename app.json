@@ -3,6 +3,7 @@
     "name": "myplan",
     "slug": "myplan",
     "version": "1.0.0",
+    "scheme": "myplan",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -36,6 +37,29 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to add images to habit logs."
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "HabitWidget",
+              "label": "MyPlan 习惯打卡",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "description": "快速查看和打卡今日习惯",
+              "previewImage": "./assets/icon.png"
+            },
+            {
+              "name": "TodoWidget",
+              "label": "MyPlan 待办事项",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "description": "快速查看今日待办",
+              "previewImage": "./assets/icon.png"
+            }
+          ]
         }
       ]
     ],

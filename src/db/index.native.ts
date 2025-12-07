@@ -56,10 +56,15 @@ const ensureDB = async (): Promise<SQLite.SQLiteDatabase> => {
         relatedHabitId TEXT,
         category TEXT,
         notificationId TEXT,
-        completedAt TEXT
+        completedAt TEXT,
+        categories TEXT
         );
         CREATE TABLE IF NOT EXISTS categories (
         name TEXT PRIMARY KEY NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL
         );
       `);
 
@@ -119,8 +124,6 @@ const ensureDB = async (): Promise<SQLite.SQLiteDatabase> => {
 
 // Explicit init function (can be called to force re-init)
 export const initDB = async () => {
-  // If we are already initialized, do nothing unless we want to force re-init?
-  // Current usage in stores is just to ensure it's ready.
   await ensureDB();
 };
 
@@ -181,7 +184,6 @@ export const deleteHabit = async (id: string) => {
 
 export const updateHabit = async (habit: Habit) => {
   await runWithRetry(async (database) => {
-    // Prepare fields
     const {
         id, name, goal, frequency, reminderTime, archived, targetValue, unit, category, color, frequencyDays, notificationIds
     } = habit;
@@ -199,21 +201,8 @@ export const updateHabit = async (habit: Habit) => {
             color = ?, 
             frequencyDays = ?, 
             notificationIds = ?
-         WHERE id = ?`,
-        [
-            name, 
-            goal || null, 
-            frequency, 
-            reminderTime || null, 
-            archived ? 1 : 0, 
-            targetValue || 1, 
-            unit || null, 
-            category || null, 
-            color || null, 
-            frequencyDays ? JSON.stringify(frequencyDays) : null, 
-            notificationIds ? JSON.stringify(notificationIds) : null,
-            id
-        ]
+        WHERE id = ?`,
+        [name, goal, frequency, reminderTime || null, archived ? 1 : 0, targetValue || 1, unit || null, category || null, color || null, frequencyDays ? JSON.stringify(frequencyDays) : null, notificationIds ? JSON.stringify(notificationIds) : null, id]
     );
   });
 };
@@ -228,97 +217,90 @@ export const addHabitLog = async (log: HabitLog) => {
   });
 };
 
-export const updateHabitLog = async (log: HabitLog) => {
-  await runWithRetry(async (database) => {
-    const { id, value, note, imageUri } = log;
-    await database.runAsync(
-        'UPDATE habit_logs SET value = ?, note = ?, imageUri = ? WHERE id = ?',
-        [value || null, note || null, imageUri || null, id]
-    );
-  });
-};
-
-export const deleteHabitLog = async (id: string) => {
-  await runWithRetry(async (database) => {
-    await database.runAsync('DELETE FROM habit_logs WHERE id = ?', [id]);
-  });
-};
-
 export const getHabitLogs = async (habitId: string): Promise<HabitLog[]> => {
   return runWithRetry(async (database) => {
-    const result = await database.getAllAsync<any>('SELECT * FROM habit_logs WHERE habitId = ? ORDER BY timestamp DESC', [habitId]);
+    const result = await database.getAllAsync<HabitLog>('SELECT * FROM habit_logs WHERE habitId = ? ORDER BY timestamp DESC', [habitId]);
     return result;
   });
 };
 
 export const getTodayLogs = async (): Promise<HabitLog[]> => {
   return runWithRetry(async (database) => {
-    const now = new Date();
-    const start = startOfDay(now).toISOString();
-    const end = endOfDay(now).toISOString();
-    const result = await database.getAllAsync<any>('SELECT * FROM habit_logs WHERE timestamp >= ? AND timestamp <= ?', [start, end]);
+    const todayStart = new Date().toISOString().split('T')[0] + '%';
+    const result = await database.getAllAsync<HabitLog>('SELECT * FROM habit_logs WHERE timestamp LIKE ?', [todayStart]);
     return result;
   });
 };
 
 export const getLogsForDate = async (dateISO: string): Promise<HabitLog[]> => {
   return runWithRetry(async (database) => {
-    const date = new Date(dateISO);
-    const start = startOfDay(date).toISOString();
-    const end = endOfDay(date).toISOString();
-    const result = await database.getAllAsync<any>('SELECT * FROM habit_logs WHERE timestamp >= ? AND timestamp <= ?', [start, end]);
-    return result;
-  });
-};
-
-export const getLogsForDateRange = async (startDateISO: string, endDateISO: string): Promise<HabitLog[]> => {
-  return runWithRetry(async (database) => {
-    const result = await database.getAllAsync<any>('SELECT * FROM habit_logs WHERE timestamp >= ? AND timestamp <= ?', [startDateISO, endDateISO]);
+    const dateStart = dateISO.split('T')[0] + '%';
+    const result = await database.getAllAsync<HabitLog>('SELECT * FROM habit_logs WHERE timestamp LIKE ?', [dateStart]);
     return result;
   });
 };
 
 export const getLogsSince = async (dateISO: string): Promise<HabitLog[]> => {
   return runWithRetry(async (database) => {
-    const result = await database.getAllAsync<any>('SELECT * FROM habit_logs WHERE timestamp >= ?', [dateISO]);
+    const result = await database.getAllAsync<HabitLog>('SELECT * FROM habit_logs WHERE timestamp >= ?', [dateISO]);
     return result;
   });
 };
 
-// Todo Operations
+export const getLogsForDateRange = async (startDateISO: string, endDateISO: string): Promise<HabitLog[]> => {
+  return runWithRetry(async (database) => {
+    const result = await database.getAllAsync<HabitLog>(
+      'SELECT * FROM habit_logs WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp DESC',
+      [startDateISO, endDateISO]
+    );
+    return result;
+  });
+};
+
 export const getTodos = async (): Promise<Todo[]> => {
   return runWithRetry(async (database) => {
     const result = await database.getAllAsync<any>('SELECT * FROM todos ORDER BY createdAt DESC');
     return result.map(row => ({
-        ...row,
-        isCompleted: !!row.isCompleted,
-        categories: row.categories ? JSON.parse(row.categories) : (row.category ? [row.category] : []), // Fallback to category for migration
+      ...row,
+      isCompleted: !!row.isCompleted,
+      categories: row.categories ? JSON.parse(row.categories) : (row.category ? [row.category] : [])
     }));
   });
 };
 
 export const addTodo = async (todo: Todo) => {
   await runWithRetry(async (database) => {
-    const { id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, categories, notificationId, completedAt } = todo;
+    const { id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories } = todo;
     await database.runAsync(
-      'INSERT INTO todos (id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, categories, notificationId, completedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, content, isCompleted ? 1 : 0, dueDate || null, createdAt, reminderTime || null, note || null, relatedHabitId || null, category || null, categories ? JSON.stringify(categories) : null, notificationId || null, completedAt || null]
+      'INSERT INTO todos (id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, content, isCompleted ? 1 : 0, dueDate || null, createdAt, reminderTime || null, note || null, relatedHabitId || null, category || null, notificationId || null, completedAt || null, categories ? JSON.stringify(categories) : null]
     );
   });
 };
 
-export const toggleTodo = async (id: string, isCompleted: boolean, completedAt?: string | null) => {
+export const toggleTodo = async (id: string, isCompleted: boolean) => {
   await runWithRetry(async (database) => {
-    await database.runAsync('UPDATE todos SET isCompleted = ?, completedAt = ? WHERE id = ?', [isCompleted ? 1 : 0, completedAt || null, id]);
+    await database.runAsync('UPDATE todos SET isCompleted = ? WHERE id = ?', [isCompleted ? 1 : 0, id]);
   });
 };
 
 export const updateTodo = async (todo: Todo) => {
   await runWithRetry(async (database) => {
-    const { id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, categories, notificationId, completedAt } = todo;
+    const { id, content, isCompleted, dueDate, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories } = todo;
     await database.runAsync(
-        'UPDATE todos SET content = ?, isCompleted = ?, dueDate = ?, createdAt = ?, reminderTime = ?, note = ?, relatedHabitId = ?, category = ?, categories = ?, notificationId = ?, completedAt = ? WHERE id = ?',
-        [content, isCompleted ? 1 : 0, dueDate || null, createdAt, reminderTime || null, note || null, relatedHabitId || null, category || null, categories ? JSON.stringify(categories) : null, notificationId || null, completedAt || null, id]
+      `UPDATE todos SET 
+        content = ?, 
+        isCompleted = ?, 
+        dueDate = ?, 
+        reminderTime = ?, 
+        note = ?, 
+        relatedHabitId = ?, 
+        category = ?, 
+        notificationId = ?, 
+        completedAt = ?, 
+        categories = ?
+      WHERE id = ?`,
+      [content, isCompleted ? 1 : 0, dueDate || null, reminderTime || null, note || null, relatedHabitId || null, category || null, notificationId || null, completedAt || null, categories ? JSON.stringify(categories) : null, id]
     );
   });
 };
@@ -329,42 +311,35 @@ export const deleteTodo = async (id: string) => {
   });
 };
 
-// Category Operations
 export const getCategories = async (): Promise<string[]> => {
   return runWithRetry(async (database) => {
-    const result = await database.getAllAsync<{name: string}>('SELECT name FROM categories ORDER BY name ASC');
-    return result.map(r => r.name);
+    const result = await database.getAllAsync<any>('SELECT name FROM categories');
+    return result.map(row => row.name);
   });
 };
 
 export const addCategory = async (category: string) => {
   await runWithRetry(async (database) => {
-    try {
-      await database.runAsync('INSERT INTO categories (name) VALUES (?)', [category]);
-    } catch (e) {
-      // Ignore duplicate errors
-    }
+    await database.runAsync('INSERT OR IGNORE INTO categories (name) VALUES (?)', [category]);
   });
 };
-
 
 // Backup & Restore
 export const getAllHabitsIncludingArchived = async (): Promise<Habit[]> => {
   return runWithRetry(async (database) => {
     const result = await database.getAllAsync<any>('SELECT * FROM habits');
     return result.map(row => ({
-        ...row,
-        archived: !!row.archived,
-        frequencyDays: row.frequencyDays ? JSON.parse(row.frequencyDays) : undefined,
-        notificationIds: row.notificationIds ? JSON.parse(row.notificationIds) : undefined,
+      ...row,
+      archived: !!row.archived,
+      frequencyDays: row.frequencyDays ? JSON.parse(row.frequencyDays) : undefined,
+      notificationIds: row.notificationIds ? JSON.parse(row.notificationIds) : undefined,
     }));
   });
 };
 
 export const getAllLogs = async (): Promise<HabitLog[]> => {
   return runWithRetry(async (database) => {
-    const result = await database.getAllAsync<any>('SELECT * FROM habit_logs');
-    return result;
+    return await database.getAllAsync<HabitLog>('SELECT * FROM habit_logs');
   });
 };
 
@@ -372,45 +347,62 @@ export const getAllTodos = async (): Promise<Todo[]> => {
   return runWithRetry(async (database) => {
     const result = await database.getAllAsync<any>('SELECT * FROM todos');
     return result.map(row => ({
-        ...row,
-        isCompleted: !!row.isCompleted,
+      ...row,
+      isCompleted: !!row.isCompleted,
+      categories: row.categories ? JSON.parse(row.categories) : (row.category ? [row.category] : [])
     }));
   });
 };
 
-export const restoreData = async (habits: Habit[], logs: HabitLog[], todos: Todo[] = []) => {
+export const restoreData = async (habits: Habit[], logs: HabitLog[], todos: Todo[]) => {
   await runWithRetry(async (database) => {
-    await database.execAsync('BEGIN TRANSACTION');
-    try {
-      await database.execAsync('DELETE FROM habit_logs');
-      await database.execAsync('DELETE FROM habits');
-      await database.execAsync('DELETE FROM todos');
-
-      for (const habit of habits) {
-        await database.runAsync(
-          'INSERT INTO habits (id, name, goal, frequency, reminderTime, createdAt, archived, targetValue, unit, category, color, frequencyDays, notificationIds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [habit.id, habit.name, habit.goal, habit.frequency, habit.reminderTime || null, habit.createdAt, habit.archived ? 1 : 0, habit.targetValue || 1, habit.unit || null, habit.category || null, habit.color || null, habit.frequencyDays ? JSON.stringify(habit.frequencyDays) : null, habit.notificationIds ? JSON.stringify(habit.notificationIds) : null]
-        );
-      }
-
-      for (const log of logs) {
-        await database.runAsync(
-          'INSERT INTO habit_logs (id, habitId, timestamp, value, note, imageUri) VALUES (?, ?, ?, ?, ?, ?)',
-          [log.id, log.habitId, log.timestamp, log.value || null, log.note || null, log.imageUri || null]
-        );
-      }
-
-      for (const todo of todos) {
-        await database.runAsync(
-          'INSERT INTO todos (id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, categories, notificationId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [todo.id, todo.content, todo.isCompleted ? 1 : 0, todo.dueDate || null, todo.createdAt, todo.reminderTime || null, todo.note || null, todo.relatedHabitId || null, todo.category || null, todo.categories ? JSON.stringify(todo.categories) : null, todo.notificationId || null]
-        );
-      }
-
-      await database.execAsync('COMMIT');
-    } catch (error) {
-      await database.execAsync('ROLLBACK');
-      throw error;
+    await database.runAsync('DELETE FROM habits');
+    await database.runAsync('DELETE FROM habit_logs');
+    await database.runAsync('DELETE FROM todos');
+    
+    // We should ideally use transactions or batch inserts here, but simple loop is safer for now
+    for (const habit of habits) {
+       // reuse add logic but with raw sql to include ID
+       const { id, name, goal, frequency, reminderTime, createdAt, archived, targetValue, unit, category, color, frequencyDays, notificationIds } = habit;
+       await database.runAsync(
+        'INSERT INTO habits (id, name, goal, frequency, reminderTime, createdAt, archived, targetValue, unit, category, color, frequencyDays, notificationIds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, name, goal, frequency, reminderTime || null, createdAt, archived ? 1 : 0, targetValue || 1, unit || null, category || null, color || null, frequencyDays ? JSON.stringify(frequencyDays) : null, notificationIds ? JSON.stringify(notificationIds) : null]
+      );
     }
+    
+    for (const log of logs) {
+       const { id, habitId, timestamp, value, note, imageUri } = log;
+       await database.runAsync(
+        'INSERT INTO habit_logs (id, habitId, timestamp, value, note, imageUri) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, habitId, timestamp, value || null, note || null, imageUri || null]
+      );
+    }
+    
+    for (const todo of todos) {
+       const { id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories } = todo;
+       await database.runAsync(
+        'INSERT INTO todos (id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, content, isCompleted ? 1 : 0, dueDate || null, createdAt, reminderTime || null, note || null, relatedHabitId || null, category || null, notificationId || null, completedAt || null, categories ? JSON.stringify(categories) : null]
+      );
+    }
+  });
+};
+
+export const getWidgetTheme = async (): Promise<'light' | 'dark'> => {
+  return runWithRetry(async (database) => {
+    const result = await database.getAllAsync<any>('SELECT value FROM settings WHERE key = ?', ['widget_theme']);
+    if (result && result.length > 0) {
+      return result[0].value as 'light' | 'dark';
+    }
+    return 'light'; // default
+  });
+};
+
+export const setWidgetTheme = async (theme: 'light' | 'dark') => {
+  await runWithRetry(async (database) => {
+    await database.runAsync(
+      'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+      ['widget_theme', theme]
+    );
   });
 };

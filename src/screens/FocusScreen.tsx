@@ -80,9 +80,9 @@ export const FocusScreen = () => {
   const progress = initialTime > 0 ? (initialTime - timeLeft) / initialTime : 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text variant="headlineMedium" style={{ fontWeight: 'bold', color: theme.colors.primary }}>专注</Text>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10, backgroundColor: theme.colors.surface }]}>
+        <Text variant="titleLarge" style={{ fontWeight: 'bold', color: theme.colors.onSurface }}>专注</Text>
       </View>
 
       <View style={styles.content}>
@@ -171,7 +171,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
     paddingBottom: 10,
   },
   content: {

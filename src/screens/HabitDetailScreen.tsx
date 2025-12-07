@@ -244,18 +244,18 @@ export const HabitDetailScreen = () => {
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Title style={{ color: theme.colors.onBackground, marginBottom: 16, textAlign: 'center' }}>{habit.name}</Title>
       
-      <View style={styles.statsRow}>
+      <View style={[styles.statsRow, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: theme.colors.primary }]}>{stats?.currentStreak || 0}</Text>
-            <Text style={styles.statLabel}>当前连续</Text>
+            <Text style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>当前连续</Text>
         </View>
-        <View style={[styles.statItem, styles.statBorder]}>
+        <View style={[styles.statItem, styles.statBorder, { borderColor: theme.colors.outlineVariant }]}>
             <Text style={[styles.statValue, { color: theme.colors.primary }]}>{stats?.bestStreak || 0}</Text>
-            <Text style={styles.statLabel}>历史最高</Text>
+            <Text style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>历史最高</Text>
         </View>
         <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: theme.colors.primary }]}>{stats?.totalDays || 0}</Text>
-            <Text style={styles.statLabel}>累计打卡</Text>
+            <Text style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>累计打卡</Text>
         </View>
       </View>
 
@@ -282,31 +282,41 @@ export const HabitDetailScreen = () => {
         </View>
       )}
 
-      <View style={styles.infoContainer}>
+      <View style={[styles.infoContainer, { backgroundColor: theme.colors.surface }]}>
         <List.Item
           title="目标描述"
+          titleStyle={{ color: theme.colors.onSurface }}
           description={habit.goal || '无'}
-          left={props => <List.Icon {...props} icon="target" />}
+          descriptionStyle={{ color: theme.colors.onSurfaceVariant }}
+          left={props => <List.Icon {...props} color={theme.colors.primary} icon="target" />}
         />
         <List.Item
           title="分类"
+          titleStyle={{ color: theme.colors.onSurface }}
           description={habit.category || '默认'}
-          left={props => <List.Icon {...props} icon="tag" />}
+          descriptionStyle={{ color: theme.colors.onSurfaceVariant }}
+          left={props => <List.Icon {...props} color={theme.colors.primary} icon="tag" />}
         />
         <List.Item
           title="每日目标次数"
+          titleStyle={{ color: theme.colors.onSurface }}
           description={String(habit.targetValue || 1)}
-          left={props => <List.Icon {...props} icon="counter" />}
+          descriptionStyle={{ color: theme.colors.onSurfaceVariant }}
+          left={props => <List.Icon {...props} color={theme.colors.primary} icon="counter" />}
         />
         <List.Item
           title="频率"
+          titleStyle={{ color: theme.colors.onSurface }}
           description={habit.frequency === 'daily' ? '每天' : habit.frequency}
-          left={props => <List.Icon {...props} icon="calendar-clock" />}
+          descriptionStyle={{ color: theme.colors.onSurfaceVariant }}
+          left={props => <List.Icon {...props} color={theme.colors.primary} icon="calendar-clock" />}
         />
         <List.Item
           title="提醒时间"
+          titleStyle={{ color: theme.colors.onSurface }}
           description={habit.reminderTime ? format(new Date(habit.reminderTime), 'HH:mm') : '未设置'}
-          left={props => <List.Icon {...props} icon="bell" />}
+          descriptionStyle={{ color: theme.colors.onSurfaceVariant }}
+          left={props => <List.Icon {...props} color={theme.colors.primary} icon="bell" />}
           right={props => (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                  {habit.reminderTime && (
@@ -329,7 +339,7 @@ export const HabitDetailScreen = () => {
 
       {showTimePicker && Platform.OS === 'ios' && (
           <Portal>
-              <Modal visible={true} onDismiss={() => setShowTimePicker(false)} contentContainerStyle={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
+              <Modal visible={true} onDismiss={() => setShowTimePicker(false)} contentContainerStyle={[styles.modalContainer, { backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.outline }]}>
                    <Title style={styles.modalTitle}>选择提醒时间</Title>
                    <View style={{ alignItems: 'center', marginVertical: 20 }}>
                        <RNDateTimePicker 
@@ -359,7 +369,7 @@ export const HabitDetailScreen = () => {
 
       {/* Edit Log Modal */}
       <Portal>
-        <Modal visible={modalVisible} onDismiss={() => setModalVisible(false)} contentContainerStyle={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
+        <Modal visible={modalVisible} onDismiss={() => setModalVisible(false)} contentContainerStyle={[styles.modalContainer, { backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.outline }]}>
           <Title style={styles.modalTitle}>
             {selectedDate ? format(selectedDate, 'yyyy年M月d日', { locale: zhCN }) : ''} 打卡记录
           </Title>
@@ -396,14 +406,16 @@ export const HabitDetailScreen = () => {
               onChangeText={setLogValue}
               keyboardType="numeric"
               mode="outlined"
-              style={[styles.input, { flex: 1, marginRight: 8 }]}
+              style={[styles.input, { flex: 1, marginRight: 8, backgroundColor: theme.colors.surface }]}
+              textColor={theme.colors.onSurface}
             />
              <TextInput
               label="备注 (可选)"
               value={logNote}
               onChangeText={setLogNote}
               mode="outlined"
-              style={[styles.input, { flex: 2 }]}
+              style={[styles.input, { flex: 2, backgroundColor: theme.colors.surface }]}
+              textColor={theme.colors.onSurface}
             />
           </View>
 
@@ -465,7 +477,6 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: '#fff',
     padding: 16,
     borderRadius: 8,
     marginBottom: 16,
@@ -478,7 +489,6 @@ const styles = StyleSheet.create({
   statBorder: {
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: '#eee',
   },
   statValue: {
     fontSize: 24,
@@ -486,13 +496,11 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
     marginTop: 4,
   },
   infoContainer: {
     width: '100%',
     marginBottom: 20,
-    backgroundColor: '#fff',
     borderRadius: 8,
   },
   actions: {
@@ -547,7 +555,6 @@ const styles = StyleSheet.create({
       marginTop: 4,
   },
   input: {
-    backgroundColor: 'white',
   },
   modalActions: {
     flexDirection: 'row',

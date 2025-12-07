@@ -45,6 +45,10 @@ const TabNavigator = () => {
         },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: 'gray',
+        tabBarStyle: {
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.outline,
+        }
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: '首页' }} />
@@ -57,9 +61,18 @@ const TabNavigator = () => {
 };
 
 export const AppNavigator = () => {
+  const theme = useTheme();
+
   return (
     <NavigationContainer>
-      <Stack.Navigator>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: theme.colors.surface,
+          },
+          headerTintColor: theme.colors.onSurface,
+        }}
+      >
         <Stack.Screen 
           name="Main" 
           component={TabNavigator} 

@@ -66,6 +66,18 @@ export const getLogsSince = async (dateISO: string): Promise<HabitLog[]> => {
   return logs.filter(l => new Date(l.timestamp).getTime() >= date);
 };
 
+export const getLogsForDateRange = async (startDateISO: string, endDateISO: string): Promise<HabitLog[]> => {
+  const logs = await getAllLogs();
+  const start = new Date(startDateISO).getTime();
+  const end = new Date(endDateISO).getTime();
+  return logs
+    .filter(l => {
+      const time = new Date(l.timestamp).getTime();
+      return time >= start && time <= end;
+    })
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+};
+
 // Todo Operations
 export const getTodos = async (): Promise<Todo[]> => {
   const json = await AsyncStorage.getItem(TODOS_KEY);
@@ -97,6 +109,14 @@ export const updateTodo = async (todo: Todo) => {
     t.id === todo.id ? todo : t
   );
   await AsyncStorage.setItem(TODOS_KEY, JSON.stringify(updatedTodos));
+};
+
+export const getWidgetTheme = async (): Promise<'light' | 'dark'> => {
+  return 'light';
+};
+
+export const setWidgetTheme = async (theme: 'light' | 'dark') => {
+  // No-op for web/mock
 };
 
 export const deleteTodo = async (id: string) => {

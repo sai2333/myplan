@@ -57,9 +57,10 @@ export const AddHabitScreen = () => {
           value={name}
           onChangeText={setName}
           mode="outlined"
-          style={styles.input}
+          style={[styles.input, { backgroundColor: theme.colors.surface }]}
           placeholder="例如：读书"
           activeOutlineColor={theme.colors.primary}
+          textColor={theme.colors.onSurface}
         />
         <HelperText type="info" visible={true}>
           给你的习惯起一个清晰的名字。
@@ -70,9 +71,10 @@ export const AddHabitScreen = () => {
           value={goal}
           onChangeText={setGoal}
           mode="outlined"
-          style={styles.input}
+          style={[styles.input, { backgroundColor: theme.colors.surface }]}
           placeholder="例如：30分钟"
           activeOutlineColor={theme.colors.primary}
+          textColor={theme.colors.onSurface}
         />
 
         <View style={styles.row}>
@@ -83,9 +85,10 @@ export const AddHabitScreen = () => {
               onChangeText={(text) => setTargetValue(text.replace(/[^0-9]/g, ''))}
               keyboardType="numeric"
               mode="outlined"
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.colors.surface }]}
               placeholder="1"
               activeOutlineColor={theme.colors.primary}
+              textColor={theme.colors.onSurface}
             />
           </View>
           <View style={{ flex: 1, marginLeft: 8 }}>
@@ -94,9 +97,10 @@ export const AddHabitScreen = () => {
               value={category}
               onChangeText={setCategory}
               mode="outlined"
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.colors.surface }]}
               placeholder="例如：健康"
               activeOutlineColor={theme.colors.primary}
+              textColor={theme.colors.onSurface}
             />
           </View>
         </View>
@@ -188,7 +192,6 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 8,
-    backgroundColor: '#FFF',
   },
   row: {
     flexDirection: 'row',

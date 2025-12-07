@@ -73,8 +73,11 @@ export const StatsScreen = () => {
   const maxCount = Math.max(...weeklyData.map(d => d.count), 1); // Avoid division by zero
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
-      <Title style={[styles.title, { color: theme.colors.onBackground }]}>数据统计</Title>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10, backgroundColor: theme.colors.surface }]}>
+        <Text variant="titleLarge" style={{ fontWeight: 'bold', color: theme.colors.onSurface }}>数据统计</Text>
+      </View>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
       
       {/* Habits Overview */}
       <Text style={styles.sectionTitle}>习惯概览</Text>
@@ -179,18 +182,26 @@ export const StatsScreen = () => {
       </Card>
 
       <View style={{ height: 40 }} />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
   },
-  title: {
-    marginBottom: 20,
-    textAlign: 'center',
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: 16,
   },
   sectionTitle: {
     fontSize: 18,
