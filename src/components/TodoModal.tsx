@@ -168,22 +168,17 @@ export const TodoModal = ({ visible, onDismiss, defaultDate, todoToEdit }: TodoM
         // Add Mode: Reset fields
         const now = new Date();
         now.setSeconds(0, 0); // Reset seconds and milliseconds
-        const initialDate = defaultDate || now;
+        
+        // Use defaultDate's date part (if provided) combined with current time
+        // This ensures we respect the selected date (e.g. from calendar) but use fresh time
+        let targetDate = new Date(now);
         if (defaultDate) {
-            // If defaultDate is provided (e.g. from schedule view), it might have time info or be start of day.
-            // Let's ensure we respect it but maybe default time to now if it's just a date?
-            // For now, just use it. But reset seconds if it's "now" context.
-            // Actually, if defaultDate is passed from ScheduleScreen, it's usually 00:00:00 or specific.
-            // If it's selectedDate (00:00:00), we might want to set time to current time?
-            // But let's stick to simple logic: reset seconds of whatever is passed or generated.
-             const d = new Date(initialDate);
-             d.setSeconds(0, 0);
-             setDueDate(d);
-             setReminderTime(d);
-        } else {
-             setDueDate(now);
-             setReminderTime(now);
+            const d = new Date(defaultDate);
+            targetDate.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
         }
+        
+        setDueDate(targetDate);
+        setReminderTime(targetDate);
         
         setContent('');
         setNote('');

@@ -219,7 +219,12 @@ export const HomeScreen = () => {
   });
 
   const handleCheckHabit = async (habitId: string) => {
-    await logHabit(habitId, 1, undefined, selectedDate.toISOString());
+    // If selectedDate is today, use current time for accurate timestamp
+    // Otherwise use the selectedDate (for backlog)
+    const isToday = isSameDay(selectedDate, new Date());
+    const timestamp = isToday ? new Date().toISOString() : selectedDate.toISOString();
+    
+    await logHabit(habitId, 1, undefined, timestamp);
     playCompletionSound();
     if (isVibrationEnabled) {
       Vibration.vibrate();
