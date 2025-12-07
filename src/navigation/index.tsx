@@ -1,9 +1,10 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import { useSettingsStore } from '../store/useSettingsStore';
 
 import { HomeScreen } from '../screens/HomeScreen';
 import { StatsScreen } from '../screens/StatsScreen';
@@ -48,7 +49,8 @@ const TabNavigator = () => {
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
           borderTopColor: theme.colors.outline,
-        }
+        },
+        sceneStyle: { backgroundColor: 'transparent' }, // Important for transparent background
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: '首页' }} />
@@ -62,15 +64,32 @@ const TabNavigator = () => {
 
 export const AppNavigator = () => {
   const theme = useTheme();
+  const themeMode = useSettingsStore((state) => state.themeMode);
+
+  const navigationTheme = React.useMemo(() => {
+    const baseTheme = (themeMode === 'dark' || themeMode === 'splatoon') ? DarkTheme : DefaultTheme;
+    return {
+      ...baseTheme,
+      colors: {
+        ...baseTheme.colors,
+        background: theme.colors.background, // Sync background color
+        card: theme.colors.surface,
+        text: theme.colors.onSurface,
+        border: theme.colors.outline,
+        primary: theme.colors.primary,
+      },
+    };
+  }, [themeMode, theme]);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator
         screenOptions={{
           headerStyle: {
             backgroundColor: theme.colors.surface,
           },
           headerTintColor: theme.colors.onSurface,
+          contentStyle: { backgroundColor: 'transparent' }, // Important for transparent background
         }}
       >
         <Stack.Screen 

@@ -24,6 +24,27 @@ export const theme = {
   fonts: configureFonts({config: fontConfig}),
 };
 
+export const splatoonTheme = {
+  ...MD3DarkTheme,
+  colors: {
+    ...MD3DarkTheme.colors,
+    primary: '#E1F803', // Neon Yellow
+    secondary: '#603BFF', // Neon Purple/Blue
+    tertiary: '#F60594', // Neon Pink
+    background: 'transparent', // Transparent to show ink splats
+    surface: 'rgba(20, 20, 20, 0.8)', // Semi-transparent dark surface
+    error: '#FF4500',
+    onPrimary: '#000000',
+    onSecondary: '#FFFFFF',
+    onBackground: '#FFFFFF',
+    onSurface: '#FFFFFF',
+    // Custom
+    textPrimary: '#FFFFFF',
+    textSecondary: '#CCCCCC',
+  },
+  fonts: configureFonts({config: fontConfig}),
+};
+
 export const darkTheme = {
   ...MD3DarkTheme,
   colors: {
@@ -40,6 +61,26 @@ export const darkTheme = {
     // Custom
     textPrimary: '#E0E0E0',
     textSecondary: '#A0A0A0',
+  },
+  fonts: configureFonts({config: fontConfig}),
+};
+
+export const marioTheme = {
+  ...MD3LightTheme,
+  colors: {
+    ...MD3LightTheme.colors,
+    primary: '#E70012', // Mario Red
+    secondary: '#FFD700', // Coin Gold
+    background: 'transparent', // Sky Blue -> Transparent to show background component
+    surface: '#FFFFFF', // White
+    error: '#B22222', // Firebrick
+    onPrimary: '#FFFFFF',
+    onSecondary: '#000000',
+    onBackground: '#000000',
+    onSurface: '#000000',
+    // Custom
+    textPrimary: '#000000',
+    textSecondary: '#4A4A4A',
   },
   fonts: configureFonts({config: fontConfig}),
 };

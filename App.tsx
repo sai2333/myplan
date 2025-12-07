@@ -6,12 +6,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { AppNavigator } from './src/navigation';
-import { theme, darkTheme } from './src/theme';
+import { theme, darkTheme, marioTheme, splatoonTheme } from './src/theme';
 import { useSettingsStore } from './src/store/useSettingsStore';
 import { registerForPushNotificationsAsync, ensureChannelExists } from './src/services/notification';
 import * as DB from './src/db';
 import { updateAllWidgets } from './src/services/widget';
 import { initAudioMode } from './src/utils/sound';
+
+import { MarioBackground } from './src/components/MarioBackground';
+import { SplatoonBackground } from './src/components/SplatoonBackground';
 
 // Suppress the error about Push Notifications in Expo Go (we only use Local Notifications)
 LogBox.ignoreLogs([
@@ -155,15 +158,23 @@ Notifications.setNotificationHandler({
 });
 
 export default function App() {
-  const isDarkTheme = useSettingsStore((state) => state.isDarkTheme);
+  const themeMode = useSettingsStore((state) => state.themeMode);
+
+  const currentTheme = React.useMemo(() => {
+    if (themeMode === 'dark') return darkTheme;
+    if (themeMode === 'mario') return marioTheme;
+    if (themeMode === 'splatoon') return splatoonTheme;
+    return theme;
+  }, [themeMode]);
 
   useEffect(() => {
     if (Platform.OS === 'android') {
-      DB.setWidgetTheme(isDarkTheme ? 'dark' : 'light').then(() => {
+      const widgetTheme = themeMode === 'dark' ? 'dark' : 'light';
+      DB.setWidgetTheme(widgetTheme).then(() => {
         updateAllWidgets();
       });
     }
-  }, [isDarkTheme]);
+  }, [themeMode]);
 
   useEffect(() => {
     initAudioMode();
@@ -197,9 +208,19 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <PaperProvider theme={isDarkTheme ? darkTheme : theme}>
-        <AppNavigator />
-        <StatusBar style={isDarkTheme ? 'light' : 'dark'} />
+      <PaperProvider theme={currentTheme}>
+        {themeMode === 'mario' ? (
+          <MarioBackground>
+            <AppNavigator />
+          </MarioBackground>
+        ) : themeMode === 'splatoon' ? (
+          <SplatoonBackground>
+            <AppNavigator />
+          </SplatoonBackground>
+        ) : (
+          <AppNavigator />
+        )}
+        <StatusBar style={themeMode === 'dark' || themeMode === 'splatoon' ? 'light' : 'dark'} />
       </PaperProvider>
     </SafeAreaProvider>
   );
