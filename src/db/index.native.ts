@@ -57,7 +57,8 @@ const ensureDB = async (): Promise<SQLite.SQLiteDatabase> => {
         category TEXT,
         notificationId TEXT,
         completedAt TEXT,
-        categories TEXT
+        categories TEXT,
+        autoPostpone INTEGER DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS categories (
         name TEXT PRIMARY KEY NOT NULL
@@ -83,6 +84,7 @@ const ensureDB = async (): Promise<SQLite.SQLiteDatabase> => {
         'ALTER TABLE todos ADD COLUMN categories TEXT', // JSON string for multiple categories
         'ALTER TABLE todos ADD COLUMN notificationId TEXT',
         'ALTER TABLE todos ADD COLUMN completedAt TEXT',
+        'ALTER TABLE todos ADD COLUMN autoPostpone INTEGER DEFAULT 0',
         'ALTER TABLE habit_logs ADD COLUMN imageUri TEXT'
       ];
 
@@ -263,6 +265,7 @@ export const getTodos = async (): Promise<Todo[]> => {
     return result.map(row => ({
       ...row,
       isCompleted: !!row.isCompleted,
+      autoPostpone: !!row.autoPostpone,
       categories: row.categories ? JSON.parse(row.categories) : (row.category ? [row.category] : [])
     }));
   });
@@ -270,23 +273,23 @@ export const getTodos = async (): Promise<Todo[]> => {
 
 export const addTodo = async (todo: Todo) => {
   await runWithRetry(async (database) => {
-    const { id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories } = todo;
+    const { id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories, autoPostpone } = todo;
     await database.runAsync(
-      'INSERT INTO todos (id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, content, isCompleted ? 1 : 0, dueDate || null, createdAt, reminderTime || null, note || null, relatedHabitId || null, category || null, notificationId || null, completedAt || null, categories ? JSON.stringify(categories) : null]
+      'INSERT INTO todos (id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories, autoPostpone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, content, isCompleted ? 1 : 0, dueDate || null, createdAt, reminderTime || null, note || null, relatedHabitId || null, category || null, notificationId || null, completedAt || null, categories ? JSON.stringify(categories) : null, autoPostpone ? 1 : 0]
     );
   });
 };
 
-export const toggleTodo = async (id: string, isCompleted: boolean) => {
+export const toggleTodo = async (id: string, isCompleted: boolean, completedAt: string | null = null) => {
   await runWithRetry(async (database) => {
-    await database.runAsync('UPDATE todos SET isCompleted = ? WHERE id = ?', [isCompleted ? 1 : 0, id]);
+    await database.runAsync('UPDATE todos SET isCompleted = ?, completedAt = ? WHERE id = ?', [isCompleted ? 1 : 0, completedAt, id]);
   });
 };
 
 export const updateTodo = async (todo: Todo) => {
   await runWithRetry(async (database) => {
-    const { id, content, isCompleted, dueDate, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories } = todo;
+    const { id, content, isCompleted, dueDate, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories, autoPostpone } = todo;
     await database.runAsync(
       `UPDATE todos SET 
         content = ?, 
@@ -298,9 +301,10 @@ export const updateTodo = async (todo: Todo) => {
         category = ?, 
         notificationId = ?, 
         completedAt = ?, 
-        categories = ?
+        categories = ?,
+        autoPostpone = ?
       WHERE id = ?`,
-      [content, isCompleted ? 1 : 0, dueDate || null, reminderTime || null, note || null, relatedHabitId || null, category || null, notificationId || null, completedAt || null, categories ? JSON.stringify(categories) : null, id]
+      [content, isCompleted ? 1 : 0, dueDate || null, reminderTime || null, note || null, relatedHabitId || null, category || null, notificationId || null, completedAt || null, categories ? JSON.stringify(categories) : null, autoPostpone ? 1 : 0, id]
     );
   });
 };
@@ -349,16 +353,18 @@ export const getAllTodos = async (): Promise<Todo[]> => {
     return result.map(row => ({
       ...row,
       isCompleted: !!row.isCompleted,
+      autoPostpone: !!row.autoPostpone,
       categories: row.categories ? JSON.parse(row.categories) : (row.category ? [row.category] : [])
     }));
   });
 };
 
-export const restoreData = async (habits: Habit[], logs: HabitLog[], todos: Todo[]) => {
+export const restoreData = async (habits: Habit[], logs: HabitLog[], todos: Todo[], categories: string[] = []) => {
   await runWithRetry(async (database) => {
     await database.runAsync('DELETE FROM habits');
     await database.runAsync('DELETE FROM habit_logs');
     await database.runAsync('DELETE FROM todos');
+    await database.runAsync('DELETE FROM categories');
     
     // We should ideally use transactions or batch inserts here, but simple loop is safer for now
     for (const habit of habits) {
@@ -379,11 +385,15 @@ export const restoreData = async (habits: Habit[], logs: HabitLog[], todos: Todo
     }
     
     for (const todo of todos) {
-       const { id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories } = todo;
+       const { id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories, autoPostpone } = todo;
        await database.runAsync(
-        'INSERT INTO todos (id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, content, isCompleted ? 1 : 0, dueDate || null, createdAt, reminderTime || null, note || null, relatedHabitId || null, category || null, notificationId || null, completedAt || null, categories ? JSON.stringify(categories) : null]
+        'INSERT INTO todos (id, content, isCompleted, dueDate, createdAt, reminderTime, note, relatedHabitId, category, notificationId, completedAt, categories, autoPostpone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, content, isCompleted ? 1 : 0, dueDate || null, createdAt, reminderTime || null, note || null, relatedHabitId || null, category || null, notificationId || null, completedAt || null, categories ? JSON.stringify(categories) : null, autoPostpone ? 1 : 0]
       );
+    }
+
+    for (const category of categories) {
+        await database.runAsync('INSERT OR IGNORE INTO categories (name) VALUES (?)', [category]);
     }
   });
 };

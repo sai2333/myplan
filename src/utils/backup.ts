@@ -1,8 +1,9 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
+const { StorageAccessFramework } = FileSystem;
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { Alert, Platform } from 'react-native';
-import { getAllHabitsIncludingArchived, getAllLogs, getAllTodos, restoreData } from '../db';
+import { getAllHabitsIncludingArchived, getAllLogs, getAllTodos, getCategories, restoreData } from '../db';
 import { Habit, HabitLog, Todo } from '../types';
 
 export const exportData = async () => {
@@ -10,14 +11,16 @@ export const exportData = async () => {
     const habits = await getAllHabitsIncludingArchived();
     const logs = await getAllLogs();
     const todos = await getAllTodos();
+    const categories = await getCategories();
 
     const backupData = {
-      version: 2, // Incremented version for new schema support
+      version: 3, // Incremented version for categories support
       timestamp: new Date().toISOString(),
       data: {
         habits,
         logs,
         todos,
+        categories,
       },
     };
 
@@ -42,6 +45,27 @@ export const exportData = async () => {
     }
 
     const fileName = `myplan_backup_${new Date().getTime()}.json`;
+
+    if (Platform.OS === 'android') {
+      try {
+        const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (permissions.granted) {
+          const uri = permissions.directoryUri;
+          const fileUri = await StorageAccessFramework.createFileAsync(uri, fileName, 'application/json');
+          await StorageAccessFramework.writeAsStringAsync(fileUri, jsonString, { encoding: FileSystem.EncodingType.UTF8 });
+          Alert.alert('导出成功', '文件已保存');
+        } else {
+          // User denied permission, maybe fall back or just return
+          // Alert.alert('导出取消', '未获得存储权限');
+        }
+      } catch (e) {
+        console.error('Android SAF export error:', e);
+        Alert.alert('导出失败', '保存文件时出错');
+      }
+      return;
+    }
+
+    // iOS implementation (and fallback)
     const filePath = `${FileSystem.documentDirectory}${fileName}`;
 
     await FileSystem.writeAsStringAsync(filePath, jsonString);
@@ -93,11 +117,11 @@ export const importData = async (onSuccess?: () => void) => {
       return;
     }
 
-    const { habits, logs, todos } = backupData.data as { habits: Habit[]; logs: HabitLog[]; todos?: Todo[] };
+    const { habits, logs, todos, categories } = backupData.data as { habits: Habit[]; logs: HabitLog[]; todos?: Todo[]; categories?: string[] };
 
     Alert.alert(
       '确认恢复',
-      `将恢复 ${habits.length} 个习惯、${logs.length} 条记录和 ${todos?.length || 0} 个待办，这将覆盖当前所有数据。确定吗？`,
+      `将恢复 ${habits.length} 个习惯、${logs.length} 条记录、${todos?.length || 0} 个待办和 ${categories?.length || 0} 个分类，这将覆盖当前所有数据。确定吗？`,
       [
         { text: '取消', style: 'cancel' },
         { 
@@ -105,7 +129,7 @@ export const importData = async (onSuccess?: () => void) => {
           style: 'destructive', 
           onPress: async () => {
             try {
-              await restoreData(habits, logs, todos || []);
+              await restoreData(habits, logs, todos || [], categories || []);
               Alert.alert('恢复成功', '数据已恢复');
               if (onSuccess) onSuccess();
             } catch (e) {

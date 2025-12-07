@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, StyleSheet, Alert, ScrollView, Image, Platform, Keyboard, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Alert, ScrollView, Image, Platform, Keyboard, ActivityIndicator, Vibration } from 'react-native';
 import { Title, Text, Button, useTheme, Paragraph, List, Portal, Modal, TextInput, IconButton, Divider, Card, Snackbar } from 'react-native-paper';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useHabitStore } from '../store/useHabitStore';
+import { useSettingsStore } from '../store/useSettingsStore';
 import { HabitCalendar } from '../components/HabitCalendar';
 import { HabitHeatmap } from '../components/HabitHeatmap';
 import { calculateHabitStats } from '../utils/stats';
@@ -23,6 +24,7 @@ export const HabitDetailScreen = () => {
   const theme = useTheme();
   const { id } = route.params as { id: string };
   const { habits, archiveHabit, fetchHabitLogs, currentHabitLogs, currentHabitDailyTotals, logHabit, updateLog, deleteLog, updateHabit, clearCurrentHabitData } = useHabitStore();
+  const { isVibrationEnabled } = useSettingsStore();
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -80,15 +82,19 @@ export const HabitDetailScreen = () => {
     if (Platform.OS === 'android') {
         setShowTimePicker(false);
         if (selectedDate && event.type !== 'dismissed') {
+            const d = new Date(selectedDate);
+            d.setSeconds(0, 0);
             await updateHabit({
                 id: habit.id,
-                reminderTime: selectedDate.toISOString()
+                reminderTime: d.toISOString()
             });
         }
     } else {
         // iOS
         if (selectedDate) {
-            setTempDate(selectedDate);
+            const d = new Date(selectedDate);
+            d.setSeconds(0, 0);
+            setTempDate(d);
         }
     }
   };
@@ -170,6 +176,9 @@ export const HabitDetailScreen = () => {
         setModalVisible(false);
         await logHabit(id, value, logNote, timestamp, logImage);
         playCompletionSound();
+        if (isVibrationEnabled) {
+          Vibration.vibrate();
+        }
         setSnackbarText('记录已添加');
         setSnackbarVisible(true);
       } catch (e: any) {

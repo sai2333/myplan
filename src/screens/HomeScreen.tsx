@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Dimensions, Animated, AppState, AppStateStatus, Linking } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Dimensions, Animated, AppState, AppStateStatus, Linking, Vibration } from 'react-native';
 import { Text, Card, Title, IconButton, useTheme, Checkbox, FAB, Portal, Dialog, Button, TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { format, addDays, isSameDay, parseISO, getDay, isBefore, startOfDay } fr
 import { zhCN } from 'date-fns/locale';
 import { useHabitStore } from '../store/useHabitStore';
 import { useTodoStore } from '../store/useTodoStore';
+import { useSettingsStore } from '../store/useSettingsStore';
 import { Todo } from '../types';
 import { TodoModal } from '../components/TodoModal';
 import { playCompletionSound } from '../utils/sound';
@@ -18,6 +19,7 @@ export const HomeScreen = () => {
   const theme = useTheme();
   const { habits, selectedDateLogs, todayLogs, fetchHabits, fetchLogsForDate, logHabit, loading: habitsLoading } = useHabitStore();
   const { todos, fetchTodos, addTodo, toggleTodo, deleteTodo, addCategory, loading: todosLoading } = useTodoStore();
+  const { isVibrationEnabled } = useSettingsStore();
   
   // Refresh data when app comes to foreground (e.g. after widget interaction)
   useEffect(() => {
@@ -219,6 +221,9 @@ export const HomeScreen = () => {
   const handleCheckHabit = async (habitId: string) => {
     await logHabit(habitId, 1, undefined, selectedDate.toISOString());
     playCompletionSound();
+    if (isVibrationEnabled) {
+      Vibration.vibrate();
+    }
   };
 
   const handleOpenAddModal = () => {
@@ -303,6 +308,7 @@ export const HomeScreen = () => {
         <View style={{ width, flex: 1 }}>
             <ScrollView 
                 style={styles.content}
+                contentContainerStyle={{ paddingBottom: 80 }}
                 refreshControl={
                     <RefreshControl refreshing={todosLoading} onRefresh={fetchTodos} />
                 }
@@ -324,6 +330,9 @@ export const HomeScreen = () => {
                                 toggleTodo(todo.id, newValue);
                                 if (newValue) {
                                     playCompletionSound();
+                                    if (isVibrationEnabled) {
+                                      Vibration.vibrate();
+                                    }
                                 }
                             }}
                         />
@@ -357,6 +366,7 @@ export const HomeScreen = () => {
         <View style={{ width, flex: 1 }}>
             <ScrollView 
                 style={styles.content}
+                contentContainerStyle={{ paddingBottom: 80 }}
                 refreshControl={
                     <RefreshControl refreshing={habitsLoading} onRefresh={fetchHabits} />
                 }

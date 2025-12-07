@@ -6,11 +6,14 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { exportData, importData } from '../utils/backup';
 
+import { useTodoStore } from '../store/useTodoStore';
+
 export const SettingsScreen = () => {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { isDarkTheme, toggleTheme } = useSettingsStore();
+  const { isDarkTheme, toggleTheme, isVibrationEnabled, toggleVibration } = useSettingsStore();
   const fetchHabits = useHabitStore((state) => state.fetchHabits);
+  const { fetchTodos, fetchCategories } = useTodoStore();
 
   const handleExport = () => {
     exportData();
@@ -20,6 +23,8 @@ export const SettingsScreen = () => {
     importData(() => {
       // Refresh data after successful import
       fetchHabits();
+      fetchTodos();
+      fetchCategories();
     });
   };
 
@@ -33,6 +38,11 @@ export const SettingsScreen = () => {
         <List.Item
           title="深色模式"
           right={() => <Switch value={isDarkTheme} onValueChange={toggleTheme} />}
+        />
+        <List.Item
+          title="震动反馈"
+          description="完成任务时震动"
+          right={() => <Switch value={isVibrationEnabled} onValueChange={toggleVibration} />}
         />
         <Divider />
         <List.Item

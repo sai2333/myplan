@@ -53,7 +53,7 @@ export const ensureChannelExists = async () => {
   }
 };
 
-export const scheduleNotification = async (title: string, body: string, triggerDate: Date): Promise<string> => {
+export const scheduleNotification = async (title: string, body: string, triggerDate: Date, data?: any): Promise<string> => {
   try {
     // Ensure channel exists before scheduling
     await ensureChannelExists();
@@ -78,6 +78,7 @@ export const scheduleNotification = async (title: string, body: string, triggerD
         vibrate: [0, 250, 250, 250], // Force vibration
         priority: Notifications.AndroidNotificationPriority.MAX,
         channelId: 'myplan-alerts', // Updated channel ID
+        data: data,
       },
       trigger: triggerDate, // passing a Date object schedules it for that time
     });
@@ -88,7 +89,7 @@ export const scheduleNotification = async (title: string, body: string, triggerD
   }
 };
 
-export const scheduleRepeatingNotification = async (title: string, body: string, hour: number, minute: number, weekday?: number): Promise<string> => {
+export const scheduleRepeatingNotification = async (title: string, body: string, hour: number, minute: number, weekday?: number, data?: any): Promise<string> => {
   try {
     await ensureChannelExists();
     
@@ -104,6 +105,13 @@ export const scheduleRepeatingNotification = async (title: string, body: string,
         trigger.weekday = weekday + 1;
     }
 
+    const contentData = {
+        ...data,
+        createdAt: Date.now(),
+        originalHour: hour,
+        originalMinute: minute,
+    };
+
     const id = await Notifications.scheduleNotificationAsync({
       content: {
         title,
@@ -112,9 +120,11 @@ export const scheduleRepeatingNotification = async (title: string, body: string,
         vibrate: [0, 250, 250, 250],
         priority: Notifications.AndroidNotificationPriority.MAX,
         channelId: 'myplan-alerts',
+        data: contentData,
       },
       trigger,
     });
+    console.log(`Scheduled repeating notification: ID=${id}, Time=${hour}:${minute}, Trigger=${JSON.stringify(trigger)}`);
     return id;
   } catch (error) {
     console.error('Error scheduling repeating notification:', error);

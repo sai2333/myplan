@@ -42,7 +42,7 @@ export const TodoModal = ({ visible, onDismiss, defaultDate, todoToEdit }: TodoM
   const [showReminderTimePicker, setShowReminderTimePicker] = useState(false);
 
   // Related Habit
-  const [showHabitMenu, setShowHabitMenu] = useState(false);
+  const [showHabitModal, setShowHabitModal] = useState(false);
   const [relatedHabitId, setRelatedHabitId] = useState<string | undefined>(undefined);
   const [relatedHabitName, setRelatedHabitName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -511,29 +511,61 @@ export const TodoModal = ({ visible, onDismiss, defaultDate, todoToEdit }: TodoM
              </View>
           </RNModal>
 
-          <Menu
-            visible={showHabitMenu}
-            onDismiss={() => setShowHabitMenu(false)}
-            anchor={
-              <Button mode="outlined" onPress={() => setShowHabitMenu(true)} style={styles.input}>
-                {selectedHabit ? `关联习惯: ${selectedHabit.name}` : '关联习惯 (可选)'}
-              </Button>
-            }
-          >
-            <Menu.Item onPress={() => { setRelatedHabitId(undefined); setShowHabitMenu(false); }} title="无" />
-            <Divider />
-            {habits.map(habit => (
-              <Menu.Item 
-                key={habit.id} 
-                onPress={() => { 
-                  setRelatedHabitId(habit.id); 
-                  setRelatedHabitName(habit.name);
-                  setShowHabitMenu(false); 
-                }} 
-                title={habit.name} 
-              />
-            ))}
-          </Menu>
+          <Button mode="outlined" onPress={() => setShowHabitModal(true)} style={styles.input}>
+            {selectedHabit ? `关联习惯: ${selectedHabit.name}` : '关联习惯 (可选)'}
+          </Button>
+
+          <RNModal visible={showHabitModal} transparent={true} animationType="fade" onRequestClose={() => setShowHabitModal(false)}>
+             <View style={{flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20}}>
+                <View style={{backgroundColor: theme.colors.background, borderRadius: 8, maxHeight: '80%', borderWidth: 1, borderColor: theme.colors.outline}}>
+                    <Text style={{fontSize: 18, fontWeight: 'bold', padding: 16, textAlign: 'center', color: theme.colors.onSurface}}>关联习惯</Text>
+                    <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+                        <TouchableOpacity 
+                            style={styles.categoryItem}
+                            onPress={() => setRelatedHabitId(undefined)}
+                        >
+                            <Checkbox.Android 
+                                status={!relatedHabitId ? 'checked' : 'unchecked'} 
+                                onPress={() => setRelatedHabitId(undefined)}
+                            />
+                            <Text style={{ marginLeft: 8, fontSize: 16 }}>无</Text>
+                        </TouchableOpacity>
+                        
+                        <Divider style={{ marginVertical: 8 }} />
+
+                        {habits.length === 0 ? (
+                             <Text style={{ padding: 20, textAlign: 'center', color: '#999' }}>暂无习惯</Text>
+                        ) : (
+                            habits.map(habit => {
+                                const isSelected = relatedHabitId === habit.id;
+                                return (
+                                    <TouchableOpacity 
+                                        key={habit.id} 
+                                        style={styles.categoryItem}
+                                        onPress={() => {
+                                            setRelatedHabitId(habit.id);
+                                            setRelatedHabitName(habit.name);
+                                        }}
+                                    >
+                                        <Checkbox.Android 
+                                            status={isSelected ? 'checked' : 'unchecked'} 
+                                            onPress={() => {
+                                                setRelatedHabitId(habit.id);
+                                                setRelatedHabitName(habit.name);
+                                            }}
+                                        />
+                                        <Text style={{ marginLeft: 8, fontSize: 16 }}>{habit.name}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })
+                        )}
+                    </ScrollView>
+                    <View style={{padding: 8, flexDirection: 'row', justifyContent: 'flex-end'}}>
+                        <Button onPress={() => setShowHabitModal(false)}>完成</Button>
+                    </View>
+                </View>
+             </View>
+          </RNModal>
 
         </ScrollView>
 

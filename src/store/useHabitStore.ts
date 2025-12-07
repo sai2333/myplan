@@ -117,13 +117,34 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       const date = new Date(reminderTime);
       const hour = date.getHours();
       const minute = date.getMinutes();
+      console.log(`Scheduling habit reminder for: ${name}, ISO=${reminderTime}, Local=${date.toString()}, Hour=${hour}, Minute=${minute}`);
       
+      // Safety Net: Schedule a one-time notification for today if the time is in the future
+      // This ensures that even if the repeating notification fires immediately (due to OS bugs) and gets intercepted,
+      // the user still gets a notification today.
+      const now = new Date();
+      const todayTarget = new Date();
+      todayTarget.setHours(hour, minute, 0, 0);
+      
+      if (todayTarget > now) {
+         console.log('Scheduling one-time catch-up notification for today');
+         const nid = await NotificationService.scheduleNotification(
+             '习惯提醒',
+             `该打卡了: ${name}`,
+             todayTarget,
+             { type: 'habit_onetime' }
+         );
+         if (nid) notificationIds.push(nid);
+      }
+
       if (frequency === 'daily') {
         const nid = await NotificationService.scheduleRepeatingNotification(
           '习惯提醒',
           `该打卡了: ${name}`,
           hour,
-          minute
+          minute,
+          undefined,
+          { type: 'habit' }
         );
         if (nid) notificationIds.push(nid);
       } else if (frequency === 'specific_days' && frequencyDays) {
@@ -133,7 +154,8 @@ export const useHabitStore = create<HabitState>((set, get) => ({
             `该打卡了: ${name}`,
             hour,
             minute,
-            day
+            day,
+            { type: 'habit' }
           );
           if (nid) notificationIds.push(nid);
         }
@@ -283,13 +305,31 @@ export const useHabitStore = create<HabitState>((set, get) => ({
              const date = new Date(updatedHabit.reminderTime);
              const hour = date.getHours();
              const minute = date.getMinutes();
+
+             // Safety Net for Updates: Schedule a one-time notification for today if the time is in the future
+             const now = new Date();
+             const todayTarget = new Date();
+             todayTarget.setHours(hour, minute, 0, 0);
+             
+             if (todayTarget > now) {
+                console.log('Update Habit: Scheduling one-time catch-up notification for today');
+                const nid = await NotificationService.scheduleNotification(
+                    '习惯提醒',
+                    `该打卡了: ${updatedHabit.name}`,
+                    todayTarget,
+                    { type: 'habit_onetime' }
+                );
+                if (nid) updatedHabit.notificationIds.push(nid);
+             }
              
              if (updatedHabit.frequency === 'daily') {
                  const nid = await NotificationService.scheduleRepeatingNotification(
                      '习惯提醒',
                      `该打卡了: ${updatedHabit.name}`,
                      hour,
-                     minute
+                     minute,
+                     undefined,
+                     { type: 'habit' }
                  );
                  if (nid) updatedHabit.notificationIds.push(nid);
              } else if (updatedHabit.frequency === 'specific_days' && updatedHabit.frequencyDays) {
@@ -299,7 +339,8 @@ export const useHabitStore = create<HabitState>((set, get) => ({
                          `该打卡了: ${updatedHabit.name}`,
                          hour,
                          minute,
-                         day
+                         day,
+                         { type: 'habit' }
                      );
                      if (nid) updatedHabit.notificationIds.push(nid);
                  }

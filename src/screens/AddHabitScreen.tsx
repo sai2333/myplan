@@ -18,7 +18,11 @@ export const AddHabitScreen = () => {
   const [frequencyDays, setFrequencyDays] = useState<number[]>([]);
   
   const [hasReminder, setHasReminder] = useState(false);
-  const [reminderTime, setReminderTime] = useState(new Date());
+  const [reminderTime, setReminderTime] = useState(() => {
+    const d = new Date();
+    d.setSeconds(0, 0);
+    return d;
+  });
   const [showTimePicker, setShowTimePicker] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -159,7 +163,11 @@ export const AddHabitScreen = () => {
                     display="default"
                     onChange={(event, date) => {
                         setShowTimePicker(Platform.OS === 'ios');
-                        if (date) setReminderTime(date);
+                        if (date) {
+                          const d = new Date(date);
+                          d.setSeconds(0, 0);
+                          setReminderTime(d);
+                        }
                     }}
                 />
             )}
