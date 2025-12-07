@@ -113,12 +113,28 @@ export const useTodoStore = create<TodoState>((set, get) => ({
       createdAt: new Date().toISOString(),
     };
 
-    await DB.addTodo(newTodo);
-    await get().fetchTodos(true);
+    // Optimistic Update: Add to state immediately
+    set((state) => ({
+      todos: [newTodo, ...state.todos],
+    }));
+
+    try {
+      await DB.addTodo(newTodo);
+      // No need to fetchTodos(true) if successful
+    } catch (error) {
+      console.error('Failed to add todo:', error);
+      // Rollback
+      set((state) => ({
+        todos: state.todos.filter((t) => t.id !== newTodo.id),
+      }));
+      throw error;
+    }
   },
 
   updateTodo: async (updatedTodo: Todo) => {
     const oldTodo = get().todos.find(t => t.id === updatedTodo.id);
+    if (!oldTodo) return;
+
     let notificationId = updatedTodo.notificationId;
 
     // Check if reminder changed
@@ -158,14 +174,28 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     }
 
     const finalTodo = { ...updatedTodo, notificationId };
-    await DB.updateTodo(finalTodo);
-    await get().fetchTodos(true);
+
+    // Optimistic Update
+    set((state) => ({
+      todos: state.todos.map((t) => (t.id === finalTodo.id ? finalTodo : t)),
+    }));
+
+    try {
+      await DB.updateTodo(finalTodo);
+    } catch (error) {
+      console.error('Failed to update todo:', error);
+      // Rollback
+      set((state) => ({
+        todos: state.todos.map((t) => (t.id === oldTodo.id ? oldTodo : t)),
+      }));
+      throw error;
+    }
   },
 
   toggleTodo: async (id: string, isCompleted: boolean) => {
-    // Optional: Cancel notification if completed? 
-    // For now, let's keep it simple. Or strictly:
     const todo = get().todos.find(t => t.id === id);
+    if (!todo) return;
+
     if (isCompleted && todo?.notificationId) {
         await NotificationService.cancelNotification(todo.notificationId);
         // Note: We might want to clear notificationId from DB, but keeping it is fine as long as we know it's cancelled or don't care.
@@ -173,16 +203,50 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     }
 
     const completedAt = isCompleted ? new Date().toISOString() : null;
-    await DB.toggleTodo(id, isCompleted, completedAt);
-    await get().fetchTodos(true);
+    const updatedTodo = { ...todo, isCompleted, completedAt };
+
+    // Optimistic Update
+    set((state) => ({
+      todos: state.todos.map((t) => (t.id === id ? updatedTodo : t)),
+    }));
+
+    try {
+      await DB.toggleTodo(id, isCompleted, completedAt);
+    } catch (error) {
+      console.error('Failed to toggle todo:', error);
+      // Rollback
+      set((state) => ({
+        todos: state.todos.map((t) => (t.id === id ? todo : t)),
+      }));
+      throw error;
+    }
   },
 
   deleteTodo: async (id: string) => {
     const todo = get().todos.find(t => t.id === id);
+    if (!todo) return;
+
     if (todo?.notificationId) {
       await NotificationService.cancelNotification(todo.notificationId);
     }
-    await DB.deleteTodo(id);
-    await get().fetchTodos(true);
+
+    // Optimistic Update
+    set((state) => ({
+      todos: state.todos.filter((t) => t.id !== id),
+    }));
+
+    try {
+      await DB.deleteTodo(id);
+    } catch (error) {
+      console.error('Failed to delete todo:', error);
+      // Rollback
+      set((state) => ({
+        todos: [...state.todos, todo], // Append to end, or sort? Simplest is append or insert at index if we tracked it
+      }));
+      // Ideally we should insert it back where it was, but this is a rare error case.
+      // Re-fetching might be safer for rollback:
+      await get().fetchTodos(true);
+      throw error;
+    }
   },
 }));

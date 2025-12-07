@@ -11,6 +11,7 @@ import { useSettingsStore } from './src/store/useSettingsStore';
 import { registerForPushNotificationsAsync, ensureChannelExists } from './src/services/notification';
 import * as DB from './src/db';
 import { updateAllWidgets } from './src/services/widget';
+import { initAudioMode } from './src/utils/sound';
 
 // Suppress the error about Push Notifications in Expo Go (we only use Local Notifications)
 LogBox.ignoreLogs([
@@ -165,6 +166,8 @@ export default function App() {
   }, [isDarkTheme]);
 
   useEffect(() => {
+    initAudioMode();
+
     const initNotifications = async () => {
       try {
         // Always ensure channel exists (safe and needed for local notifications on Android)

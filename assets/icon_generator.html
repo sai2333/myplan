@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>像素图标生成器</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f2f5;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        canvas {
+            border: 1px solid #e5e7eb;
+            margin: 1rem 0;
+            background-image: linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+                              linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+                              linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+                              linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #2563eb;
+        }
+        button.secondary {
+            background-color: #10b981;
+        }
+        button.secondary:hover {
+            background-color: #059669;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>像素待办图标生成器</h1>
+        <p>图标已生成，请点击下方按钮下载 PNG 文件，然后替换 assets 文件夹中的对应文件。</p>
+        
+        <canvas id="iconCanvas" width="1024" height="1024" style="width: 256px; height: 256px;"></canvas>
+        
+        <div class="btn-group">
+            <button onclick="downloadImage('icon.png')">下载 icon.png</button>
+            <button class="secondary" onclick="downloadImage('adaptive-icon.png')">下载 adaptive-icon.png</button>
+            <button class="secondary" onclick="downloadImage('splash-icon.png')">下载 splash-icon.png</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('iconCanvas');
+        const ctx = canvas.getContext('2d');
+        const size = 1024;
+        const pixelSize = size / 32; // 32x32 grid
+
+        // Colors
+        const colors = {
+            bg: '#3b82f6',      // Blue Background
+            paper: '#ffffff',    // White Paper
+            border: '#1e3a8a',   // Dark Blue Border
+            line: '#e5e7eb',     // Light Grey Lines
+            box: '#d1d5db',      // Checkbox Grey
+            check: '#10b981',    // Green Check
+            checkDark: '#047857' // Darker Green
+        };
+
+        function drawPixel(x, y, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+        }
+
+        function drawRect(x, y, w, h, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x * pixelSize, y * pixelSize, w * pixelSize, h * pixelSize);
+        }
+
+        function drawIcon() {
+            // 1. Background
+            drawRect(0, 0, 32, 32, colors.bg);
+
+            // 2. Clipboard/Paper Shadow
+            // Offset by 1 pixel down-right
+            ctx.fillStyle = 'rgba(30, 58, 138, 0.3)';
+            ctx.fillRect(7 * pixelSize, 5 * pixelSize, 20 * pixelSize, 24 * pixelSize);
+
+            // 3. Paper Body
+            drawRect(6, 4, 20, 24, colors.paper);
+            
+            // Border around paper
+            ctx.strokeStyle = colors.border;
+            ctx.lineWidth = pixelSize; // 1 pixel border
+            ctx.strokeRect(6 * pixelSize + pixelSize/2, 4 * pixelSize + pixelSize/2, 19 * pixelSize, 23 * pixelSize);
+
+            // 4. Content Lines
+            const lines = [8, 13, 18, 23];
+            lines.forEach(y => {
+                // Checkbox
+                drawRect(8, y, 4, 4, colors.box);
+                // Line
+                drawRect(14, y + 1, 10, 2, colors.line);
+            });
+
+            // 5. Checkmarks
+            // First one checked
+            drawPixel(9, 10, colors.check);
+            drawPixel(10, 11, colors.check);
+            drawPixel(11, 10, colors.check);
+            drawPixel(11, 9, colors.check); // Small v shape
+
+            // 6. Big Overlay Checkmark (The Logo Feature)
+            // A big green checkmark overlaying the bottom right
+            const checkBaseX = 18;
+            const checkBaseY = 18;
+            
+            // Shadow for pop
+            const shadowOffset = 1;
+            
+            // Draw Check Shape
+            const drawBigCheck = (offsetX, offsetY, color) => {
+                // Shape:
+                //       #
+                //      #
+                // #   #
+                //  # #
+                //   #
+                
+                // Coordinates relative to base
+                const pixels = [
+                    [0, 2], [1, 3],       // Left stroke
+                    [2, 4],               // Bottom tip
+                    [3, 3], [4, 2], [5, 1], [6, 0] // Right stroke
+                ];
+
+                pixels.forEach(([dx, dy]) => {
+                    drawPixel(checkBaseX + dx + offsetX, checkBaseY + dy + offsetY, color);
+                    // Make it thicker
+                    drawPixel(checkBaseX + dx + offsetX, checkBaseY + dy + offsetY + 1, color);
+                });
+            };
+
+            // Shadow
+            drawBigCheck(1, 1, 'rgba(0,0,0,0.2)');
+            // Main
+            drawBigCheck(0, 0, colors.check);
+            
+            // Highlight
+            drawPixel(checkBaseX + 2, checkBaseY + 4, '#34d399');
+        }
+
+        drawIcon();
+
+        function downloadImage(filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+    </script>
+</body>
+</html>
